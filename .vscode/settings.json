@@ -1,0 +1,12 @@
+{
+    "idf.adapterTargetName": "esp32",
+    "C_Cpp.errorSquiggles": "enabled",
+    "files.associations": {
+        "freertos.h": "c",
+        "freertosconfig.h": "c",
+        "assert.h": "c",
+        "stdlib.h": "c",
+        "task.h": "c",
+        "sockets.h": "c"
+    }
+}
