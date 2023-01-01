@@ -16,4 +16,5 @@
 
 extern "C" void app_main(void)
 {
+    wifi_sta_loop();
 }
