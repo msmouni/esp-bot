@@ -16,5 +16,37 @@
 
 extern "C" void app_main(void)
 {
-    wifi_sta_loop();
+    SsidPassword wifi_ssid_password = {
+        .ssid = "My-SSID",
+        .password = "MY-Password",
+    };
+
+    Wifi my_wifi = Wifi(wifi_ssid_password);
+
+    my_wifi.init_nvs();
+    esp_err_t status = my_wifi.init();
+
+    if (status == ESP_OK)
+    {
+        // TMP
+        while (my_wifi.get_state() != WifiState::ReadyToConnect)
+        {
+            printf("Init ... %d", (int)my_wifi.get_state());
+            vTaskDelay(10); // TMP: TICK
+        }
+
+        my_wifi.log("CONNECT...");
+        my_wifi.connect();
+
+        // TMP
+        while (my_wifi.get_state() != WifiState::Connected)
+        {
+            vTaskDelay(10); // TMP: TICK
+        }
+        my_wifi.start_tcp_server();
+    }
+    else
+    {
+        my_wifi.log("ERROR INIT");
+    }
 }
