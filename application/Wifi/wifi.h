@@ -33,6 +33,39 @@ enum class ServerError
     ErrorConnectingToClient
 };
 
+enum class IpSetting
+{
+    StaticIp,
+    /// Dynamic Host Configuration Protocol
+    Dhcp
+};
+
+struct IpConfig
+{
+    const char *ip;
+    const char *mask;
+    const char *gw;
+};
+
+/// Dynamic Host Configuration Protocol
+struct DhcpSetting
+{
+    SsidPassword ssid_password;
+};
+
+struct StaticIpSetting
+{
+    SsidPassword ssid_password;
+    IpConfig ip_config;
+};
+
+struct NetworkIface
+{
+    esp_netif_t *netif;
+    IpSetting ip_setting;
+    IpConfig ip_config;
+};
+
 class Wifi
 {
 private:
@@ -41,9 +74,6 @@ private:
     constexpr static const char *password{"MyWifiPassword"};*/
 
     SsidPassword m_ssid_password;
-
-    // IP + GW + NetMask
-    static esp_netif_ip_info_t net_infos;
 
     // Debug Tag
     constexpr static const char *WIFI_TAG = "WIFI";
@@ -61,6 +91,8 @@ private:
 
     // static char mac_addr_cstr[13]; // Buffer to hold MAC as cstring
 
+    void create(SsidPassword);
+
     static void event_handler(void *arg, esp_event_base_t event_base,
                               int32_t event_id, void *event_data);
     static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -69,6 +101,13 @@ private:
                                  int32_t event_id, void *event_data);
 
     static esp_err_t get_mac(void);
+
+    static void set_static_ip(esp_netif_t *netif, IpConfig *ip_config);
+
+    static esp_err_t set_dns_server_infos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type);
+
+    //////////////////////////////////////  MOVE TO IpServer class
+    NetworkIface m_netiface = {};
 
 public:
     /*
@@ -79,7 +118,8 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
 
 "Rule Of Three":
 */
-    Wifi(SsidPassword);
+    Wifi(DhcpSetting);
+    Wifi(StaticIpSetting);
     ~Wifi(void) = default;
     Wifi(const Wifi &) = default;
     Wifi &operator=(const Wifi &) = default;
@@ -94,7 +134,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
     }*/
     esp_err_t init(void);
     esp_err_t connect(void);
-    ServerError start_tcp_server(void);
+    ServerError start_tcp_server(int);
     WifiState get_state(void); // Copy
     static void log(const char *debug_msg);
 };
