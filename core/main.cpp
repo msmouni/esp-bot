@@ -21,7 +21,19 @@ extern "C" void app_main(void)
         .password = "MY-Password",
     };
 
-    Wifi my_wifi = Wifi(wifi_ssid_password);
+    // Router Address: GateWay
+    IpConfig ip_config = {
+        .ip = "xxx.xxx.xxx.xxx",
+        .mask = "xxx.xxx.xxx.xxx",
+        .gw = "xxx.xxx.xxx.xxx",
+    };
+
+    StaticIpSetting static_ip_setting = {
+        .ssid_password = wifi_ssid_password,
+        .ip_config = ip_config,
+    };
+
+    Wifi my_wifi = Wifi(static_ip_setting);
 
     my_wifi.init_nvs();
     esp_err_t status = my_wifi.init();
@@ -43,7 +55,7 @@ extern "C" void app_main(void)
         {
             vTaskDelay(10); // TMP: TICK
         }
-        my_wifi.start_tcp_server();
+        my_wifi.start_tcp_server(12345);
     }
     else
     {

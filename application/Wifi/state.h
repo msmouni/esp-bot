@@ -15,6 +15,7 @@ enum class WifiState
     Initialised,
     ReadyToConnect,
     Connecting,
+    SettingIp,
     WaitingForIp,
     Connected,
     Disconnected,
