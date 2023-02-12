@@ -17,11 +17,23 @@
 extern "C" void app_main(void)
 {
     SsidPassword wifi_ssid_password = {
-        .ssid = "My-SSID",
-        .password = "MY-Password",
+        .ssid = "Bbox-9A370343",
+        .password = "QdQ3kPrVaRe6udkax9",
     };
 
-    Wifi my_wifi = Wifi(wifi_ssid_password);
+    // Router Address: GateWay
+    IpConfig ip_config = {
+        .ip = "192.168.1.55",
+        .mask = "255.255.255.0",
+        .gw = "192.168.1.254",
+    };
+
+    StaticIpSetting static_ip_setting = {
+        .ssid_password = wifi_ssid_password,
+        .ip_config = ip_config,
+    };
+
+    Wifi my_wifi = Wifi(static_ip_setting);
 
     my_wifi.init_nvs();
     esp_err_t status = my_wifi.init();
@@ -43,7 +55,7 @@ extern "C" void app_main(void)
         {
             vTaskDelay(10); // TMP: TICK
         }
-        my_wifi.start_tcp_server();
+        my_wifi.start_tcp_server(12345);
     }
     else
     {

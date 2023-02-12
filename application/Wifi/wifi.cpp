@@ -11,8 +11,7 @@ WifiState Wifi::m_state = WifiState::NotInitialised;
 wifi_init_config_t Wifi::m_wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
 int Wifi::s_retry_num = 0;
 
-// Wifi Constructor
-Wifi::Wifi(SsidPassword ssid_password)
+void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
 {
 
     /*// Check if the MAC cstring currently begins with a
@@ -44,6 +43,26 @@ Wifi::Wifi(SsidPassword ssid_password)
     ESP_LOGI(WIFI_TAG, "CONST  CONFIG SSID: %s | PASS: %s", m_wifi_config.sta.ssid, m_wifi_config.sta.password);
 }
 
+// Wifi DHCP Constructor
+Wifi::Wifi(DhcpSetting dhcp_setting)
+{
+
+    create(dhcp_setting.ssid_password);
+
+    m_netiface.ip_setting = IpSetting::Dhcp;
+}
+
+// Wifi Static Ip Constructor
+Wifi::Wifi(StaticIpSetting static_ip_setting)
+{
+
+    create(static_ip_setting.ssid_password);
+
+    m_netiface.ip_config = static_ip_setting.ip_config;
+
+    m_netiface.ip_setting = IpSetting::StaticIp;
+}
+
 void Wifi::event_handler(void *arg, esp_event_base_t event_base,
                          int32_t event_id, void *event_data)
 {
@@ -59,6 +78,42 @@ void Wifi::event_handler(void *arg, esp_event_base_t event_base,
     {
         ESP_LOGE(WIFI_TAG, "Unexpected event: %s", event_base);
     }
+}
+
+esp_err_t Wifi::set_dns_server_infos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type)
+{
+    if (addr && (addr != IPADDR_NONE))
+    {
+        esp_netif_dns_info_t dns;
+        dns.ip.u_addr.ip4.addr = addr;
+        dns.ip.type = IPADDR_TYPE_V4;
+        ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, type, &dns));
+    }
+    return ESP_OK;
+}
+
+void Wifi::set_static_ip(esp_netif_t *netif, IpConfig *ip_config)
+{
+    if (esp_netif_dhcpc_stop(netif) != ESP_OK)
+    {
+        ESP_LOGE(WIFI_TAG, "Failed to stop dhcp client");
+        return;
+    }
+    esp_netif_ip_info_t ip = {};
+    memset(&ip, 0, sizeof(esp_netif_ip_info_t));
+    ip.ip.addr = ipaddr_addr(ip_config->ip);
+    ip.netmask.addr = ipaddr_addr(ip_config->mask);
+    ip.gw.addr = ipaddr_addr(ip_config->gw);
+    if (esp_netif_set_ip_info(netif, &ip) != ESP_OK)
+    {
+        ESP_LOGE(WIFI_TAG, "Failed to set ip info");
+        return;
+    }
+
+    // As DNS
+    // Router Address: GateWay
+    set_dns_server_infos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_MAIN);
+    set_dns_server_infos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_BACKUP);
 }
 
 // event handler for wifi events
@@ -82,7 +137,27 @@ void Wifi::wifi_event_handler(void *arg, esp_event_base_t event_base,
         case WIFI_EVENT_STA_CONNECTED:
         {
             ESP_LOGI(WIFI_TAG, "Wifi STA connected");
-            m_state = WifiState::WaitingForIp;
+
+            NetworkIface *network_iface = static_cast<NetworkIface *>(arg);
+
+            switch (network_iface->ip_setting)
+            {
+            case IpSetting::StaticIp:
+            {
+                m_state = WifiState::SettingIp;
+                set_static_ip(network_iface->netif, &network_iface->ip_config);
+
+                break;
+            }
+            case IpSetting::Dhcp:
+            {
+                m_state = WifiState::WaitingForIp;
+            }
+
+            default:
+                break;
+            }
+
             break;
         }
 
@@ -125,6 +200,15 @@ void Wifi::ip_event_handler(void *arg, esp_event_base_t event_base,
         case IP_EVENT_STA_GOT_IP:
         {
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+
+            ////////////////////////////
+            /*esp_netif_t *netif = static_cast<esp_netif_t *>(arg);
+
+            esp_netif_dns_info_t dns;
+            esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+
+            ESP_LOGI(WIFI_TAG, "ESP_NETIF_DNS_MAIN %lu", dns.ip.u_addr.ip4.addr); // FE01A8C0: 254.1.168.192*/
+            ////////////////////////////
 
             ESP_LOGI(WIFI_TAG, "STA IP: " IPSTR, IP2STR(&event->ip_info.ip));
 
@@ -183,11 +267,11 @@ esp_err_t Wifi::init()
         }
 
         // create wifi station in the wifi driver
+        m_netiface.netif = esp_netif_create_default_wifi_sta();
+
         if (ESP_OK == status)
         {
-            esp_netif_t *p_netif = esp_netif_create_default_wifi_sta();
-
-            if (!p_netif)
+            if (!m_netiface.netif)
                 status = ESP_FAIL;
         }
 
@@ -200,21 +284,19 @@ esp_err_t Wifi::init()
         // EVENT LOOP
         if (ESP_OK == status)
         {
-
             status = esp_event_handler_instance_register(WIFI_EVENT,
                                                          ESP_EVENT_ANY_ID,
                                                          &wifi_event_handler,
-                                                         NULL,
+                                                         &m_netiface,
                                                          NULL);
         }
 
         if (ESP_OK == status)
         {
-
             status = esp_event_handler_instance_register(IP_EVENT,
                                                          ESP_EVENT_ANY_ID,
                                                          &ip_event_handler,
-                                                         NULL,
+                                                         m_netiface.netif,
                                                          NULL);
         }
 
@@ -279,7 +361,7 @@ esp_err_t Wifi::connect()
     return status;
 }
 
-ServerError Wifi::start_tcp_server(void)
+ServerError Wifi::start_tcp_server(int port)
 {
     int serv_sock = socket(AF_INET, SOCK_STREAM, 0);
     /* NON-BLOCKING FLAG:
@@ -354,6 +436,8 @@ ServerError Wifi::start_tcp_server(void)
 
         // TMP BLOCKING
 
+        bzero(readBuffer, sizeof(readBuffer));
+
         // ends at b"\n"
         r = read(client_socket, readBuffer, sizeof(readBuffer) - 1); // receive N_BYTES AT Once
         // r = recv(serv_sock, readBuffer, sizeof(readBuffer) - 1, 0);  // Receive data from the socket. The return value is a bytes object representing the data received. The maximum amount of data to be received at once is specified by bufsize.
@@ -364,7 +448,6 @@ ServerError Wifi::start_tcp_server(void)
             You can either add a null character after your termination character, and your printf will work,
             or you can add a '.*' in your printf statement and provide the length*/
             printf("%.*s", r, readBuffer);
-            bzero(readBuffer, sizeof(readBuffer));
         }
 
         vTaskDelay(100);
