@@ -1,4 +1,4 @@
-set(SOURCES wifi.cpp)
+set(SOURCES wifi.cpp ev_handler.cpp)
 
 idf_component_register(SRCS ${SOURCES}
                         INCLUDE_DIRS .

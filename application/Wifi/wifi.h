@@ -12,9 +12,9 @@
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
-#include "state.h"
 #include <algorithm>
 #include <cstring>
+#include "ev_handler.h"
 
 //////////////////////////////////////////////////////////  ADD MUTEX
 
@@ -33,20 +33,6 @@ enum class ServerError
     ErrorConnectingToClient
 };
 
-enum class IpSetting
-{
-    StaticIp,
-    /// Dynamic Host Configuration Protocol
-    Dhcp
-};
-
-struct IpConfig
-{
-    const char *ip;
-    const char *mask;
-    const char *gw;
-};
-
 /// Dynamic Host Configuration Protocol
 struct DhcpSetting
 {
@@ -56,13 +42,6 @@ struct DhcpSetting
 struct StaticIpSetting
 {
     SsidPassword ssid_password;
-    IpConfig ip_config;
-};
-
-struct NetworkIface
-{
-    esp_netif_t *netif;
-    IpSetting ip_setting;
     IpConfig ip_config;
 };
 
@@ -78,33 +57,23 @@ private:
     // Debug Tag
     constexpr static const char *WIFI_TAG = "WIFI";
 
-    // Strongly typed enum to define our state
-    static WifiState m_state;
+    static WifiStateHandler m_state_handler;
+    static void change_state(WifiState);
 
     // Configuration
     static wifi_init_config_t m_wifi_init_config;
     wifi_config_t m_wifi_config = {}; // All element as Default : https://iq.opengenus.org/different-ways-to-initialize-array-in-cpp/
 
-    // retry tracker
-    static const int MAX_FAILURES = 10;
-    static int s_retry_num;
-
-    // static char mac_addr_cstr[13]; // Buffer to hold MAC as cstring
+      // static char mac_addr_cstr[13]; // Buffer to hold MAC as cstring
 
     void create(SsidPassword);
 
-    static void event_handler(void *arg, esp_event_base_t event_base,
-                              int32_t event_id, void *event_data);
-    static void wifi_event_handler(void *arg, esp_event_base_t event_base,
-                                   int32_t event_id, void *event_data);
-    static void ip_event_handler(void *arg, esp_event_base_t event_base,
-                                 int32_t event_id, void *event_data);
+    static EvHandler m_ev_handler;
+
+    static void handle_event(void *arg, esp_event_base_t event_base,
+                             int32_t event_id, void *event_data);
 
     static esp_err_t get_mac(void);
-
-    static void set_static_ip(esp_netif_t *netif, IpConfig *ip_config);
-
-    static esp_err_t set_dns_server_infos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type);
 
     //////////////////////////////////////  MOVE TO IpServer class
     NetworkIface m_netiface = {};

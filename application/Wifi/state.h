@@ -1,3 +1,5 @@
+#include <mutex>
+
 /*
     Ref: https://www.geeksforgeeks.org/enum-classes-in-c-and-their-advantage-over-enum-datatype/
 
@@ -20,4 +22,26 @@ enum class WifiState
     Connected,
     Disconnected,
     Error,
+};
+
+struct WifiStateHandler
+{
+    WifiState m_state;
+
+    std::mutex m_state_mutex; /// Mutex on State
+
+    WifiStateHandler() : m_state(WifiState::NotInitialised) {}
+
+    void change_state(WifiState new_state)
+    {
+        std::lock_guard<std::mutex> state_guard(m_state_mutex);
+        m_state = new_state;
+    }
+
+    // A Copy
+    WifiState get_state()
+    {
+        std::lock_guard<std::mutex> state_guard(m_state_mutex);
+        return m_state;
+    }
 };

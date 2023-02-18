@@ -7,9 +7,11 @@ Ref:https://cpp.developpez.com/faq/cpp/?page=Les-donnees-et-fonctions-membres-st
 
 https://www.irif.fr/~carton/Enseignement/ObjetsAvances/Cours/simons.pdf
 */
-WifiState Wifi::m_state = WifiState::NotInitialised;
+
 wifi_init_config_t Wifi::m_wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
-int Wifi::s_retry_num = 0;
+WifiStateHandler Wifi::m_state_handler = WifiStateHandler();
+EvHandler Wifi::m_ev_handler = EvHandler(&Wifi::m_state_handler, Wifi::WIFI_TAG);
+// std::mutex *Wifi::m_state_mutex{};
 
 void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
 {
@@ -63,173 +65,15 @@ Wifi::Wifi(StaticIpSetting static_ip_setting)
     m_netiface.ip_setting = IpSetting::StaticIp;
 }
 
-void Wifi::event_handler(void *arg, esp_event_base_t event_base,
-                         int32_t event_id, void *event_data)
+void Wifi::change_state(WifiState new_state)
 {
-    if (WIFI_EVENT == event_base)
-    {
-        return wifi_event_handler(arg, event_base, event_id, event_data);
-    }
-    else if (IP_EVENT == event_base)
-    {
-        return ip_event_handler(arg, event_base, event_id, event_data);
-    }
-    else
-    {
-        ESP_LOGE(WIFI_TAG, "Unexpected event: %s", event_base);
-    }
+    m_state_handler.change_state(new_state);
 }
 
-esp_err_t Wifi::set_dns_server_infos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type)
+void Wifi::handle_event(void *arg, esp_event_base_t event_base,
+                        int32_t event_id, void *event_data)
 {
-    if (addr && (addr != IPADDR_NONE))
-    {
-        esp_netif_dns_info_t dns;
-        dns.ip.u_addr.ip4.addr = addr;
-        dns.ip.type = IPADDR_TYPE_V4;
-        ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, type, &dns));
-    }
-    return ESP_OK;
-}
-
-void Wifi::set_static_ip(esp_netif_t *netif, IpConfig *ip_config)
-{
-    if (esp_netif_dhcpc_stop(netif) != ESP_OK)
-    {
-        ESP_LOGE(WIFI_TAG, "Failed to stop dhcp client");
-        return;
-    }
-    esp_netif_ip_info_t ip = {};
-    memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-    ip.ip.addr = ipaddr_addr(ip_config->ip);
-    ip.netmask.addr = ipaddr_addr(ip_config->mask);
-    ip.gw.addr = ipaddr_addr(ip_config->gw);
-    if (esp_netif_set_ip_info(netif, &ip) != ESP_OK)
-    {
-        ESP_LOGE(WIFI_TAG, "Failed to set ip info");
-        return;
-    }
-
-    // As DNS
-    // Router Address: GateWay
-    set_dns_server_infos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_MAIN);
-    set_dns_server_infos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_BACKUP);
-}
-
-// event handler for wifi events
-void Wifi::wifi_event_handler(void *arg, esp_event_base_t event_base,
-                              int32_t event_id, void *event_data)
-{
-
-    if (WIFI_EVENT == event_base)
-    {
-        const wifi_event_t event_type{static_cast<wifi_event_t>(event_id)}; // cast int32_t -> wifi_event_t
-
-        switch (event_type)
-        {
-        case WIFI_EVENT_STA_START:
-        {
-            ESP_LOGI(WIFI_TAG, "Wifi STA started");
-            m_state = WifiState::ReadyToConnect;
-            break;
-        }
-
-        case WIFI_EVENT_STA_CONNECTED:
-        {
-            ESP_LOGI(WIFI_TAG, "Wifi STA connected");
-
-            NetworkIface *network_iface = static_cast<NetworkIface *>(arg);
-
-            switch (network_iface->ip_setting)
-            {
-            case IpSetting::StaticIp:
-            {
-                m_state = WifiState::SettingIp;
-                set_static_ip(network_iface->netif, &network_iface->ip_config);
-
-                break;
-            }
-            case IpSetting::Dhcp:
-            {
-                m_state = WifiState::WaitingForIp;
-            }
-
-            default:
-                break;
-            }
-
-            break;
-        }
-
-        case WIFI_EVENT_STA_DISCONNECTED:
-        {
-            if (s_retry_num < MAX_FAILURES)
-            {
-                ESP_LOGI(WIFI_TAG, "Reconnecting to AP...");
-
-                if (ESP_OK == esp_wifi_connect())
-                {
-                    m_state = WifiState::Connecting;
-
-                    s_retry_num++;
-                }
-            }
-            else
-            {
-                m_state = WifiState::Error;
-            }
-        }
-
-        default:
-            // TODO STOP and DISCONNECTED, and others
-            break;
-        }
-    }
-}
-
-void Wifi::ip_event_handler(void *arg, esp_event_base_t event_base,
-                            int32_t event_id, void *event_data)
-{
-
-    if (IP_EVENT == event_base)
-    {
-        const ip_event_t event_type{static_cast<ip_event_t>(event_id)};
-
-        switch (event_type)
-        {
-        case IP_EVENT_STA_GOT_IP:
-        {
-            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-
-            ////////////////////////////
-            /*esp_netif_t *netif = static_cast<esp_netif_t *>(arg);
-
-            esp_netif_dns_info_t dns;
-            esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
-
-            ESP_LOGI(WIFI_TAG, "ESP_NETIF_DNS_MAIN %lu", dns.ip.u_addr.ip4.addr); // FE01A8C0: 254.1.168.192*/
-            ////////////////////////////
-
-            ESP_LOGI(WIFI_TAG, "STA IP: " IPSTR, IP2STR(&event->ip_info.ip));
-
-            s_retry_num = 0;
-
-            m_state = WifiState::Connected;
-            break;
-        }
-
-        case IP_EVENT_STA_LOST_IP:
-        {
-            ESP_LOGI(WIFI_TAG, "STA LOST IP");
-            m_state = WifiState::WaitingForIp;
-            break;
-        }
-
-        default:
-            // TODO IP6
-            break;
-        }
-    }
+    m_ev_handler.handle(arg, event_base, event_id, event_data);
 }
 
 // initialize storage
@@ -254,7 +98,7 @@ esp_err_t Wifi::init()
 {
     esp_err_t status = ESP_OK;
 
-    if (WifiState::NotInitialised == m_state)
+    if (WifiState::NotInitialised == get_state())
     {
 
         // initialize the esp network interface
@@ -286,7 +130,7 @@ esp_err_t Wifi::init()
         {
             status = esp_event_handler_instance_register(WIFI_EVENT,
                                                          ESP_EVENT_ANY_ID,
-                                                         &wifi_event_handler,
+                                                         &handle_event,
                                                          &m_netiface,
                                                          NULL);
         }
@@ -295,7 +139,7 @@ esp_err_t Wifi::init()
         {
             status = esp_event_handler_instance_register(IP_EVENT,
                                                          ESP_EVENT_ANY_ID,
-                                                         &ip_event_handler,
+                                                         &handle_event,
                                                          m_netiface.netif,
                                                          NULL);
         }
@@ -322,15 +166,15 @@ esp_err_t Wifi::init()
             status = esp_wifi_start();
         }
 
-        if ((ESP_OK == status) && (WifiState::NotInitialised == m_state))
+        if ((ESP_OK == status) && (WifiState::NotInitialised == get_state()))
         {
             // In case Event happens before
-            m_state = WifiState::Initialised;
+            change_state(WifiState::Initialised);
         }
 
         ESP_LOGI(WIFI_TAG, "STA initialization complete");
     }
-    else if (WifiState::Error == m_state)
+    else if (WifiState::Error == get_state())
     {
         status = ESP_FAIL;
     }
@@ -343,14 +187,14 @@ esp_err_t Wifi::connect()
 
     esp_err_t status = ESP_OK;
 
-    switch (m_state)
+    switch (get_state())
     {
     case WifiState::ReadyToConnect:
         status = esp_wifi_connect();
 
         if (ESP_OK == status)
         {
-            m_state = WifiState::Connecting;
+            change_state(WifiState::Connecting);
         }
         break;
 
@@ -458,9 +302,8 @@ ServerError Wifi::start_tcp_server(int port)
 
 WifiState Wifi::get_state()
 {
-
-    // Mutex on state
-    return m_state; // Copy
+    // Copy
+    return m_state_handler.get_state();
 }
 
 void Wifi::log(const char *debug_msg)
