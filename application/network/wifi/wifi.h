@@ -15,35 +15,7 @@
 #include <algorithm>
 #include <cstring>
 #include "ev_handler.h"
-
-//////////////////////////////////////////////////////////  ADD MUTEX
-
-struct SsidPassword
-{
-    const char *ssid;
-    const char *password;
-};
-
-enum class ServerError
-{
-    None,
-    CannotCreateSocket,
-    CannotBindSocket,
-    CannotListenOnSocket,
-    ErrorConnectingToClient
-};
-
-/// Dynamic Host Configuration Protocol
-struct DhcpSetting
-{
-    SsidPassword ssid_password;
-};
-
-struct StaticIpSetting
-{
-    SsidPassword ssid_password;
-    IpConfig ip_config;
-};
+#include "server.h"
 
 class Wifi
 {
@@ -64,7 +36,7 @@ private:
     static wifi_init_config_t m_wifi_init_config;
     wifi_config_t m_wifi_config = {}; // All element as Default : https://iq.opengenus.org/different-ways-to-initialize-array-in-cpp/
 
-      // static char mac_addr_cstr[13]; // Buffer to hold MAC as cstring
+    // static char mac_addr_cstr[13]; // Buffer to hold MAC as cstring
 
     void create(SsidPassword);
 
@@ -75,6 +47,8 @@ private:
 
     static esp_err_t get_mac(void);
 
+    TcpIpServer m_tcp_ip_server;
+    ServerConfig m_server_config;
     //////////////////////////////////////  MOVE TO IpServer class
     NetworkIface m_netiface = {};
 
@@ -87,8 +61,8 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
 
 "Rule Of Three":
 */
-    Wifi(DhcpSetting);
-    Wifi(StaticIpSetting);
+    Wifi(DhcpSetting, ServerConfig);
+    Wifi(StaticIpSetting, ServerConfig);
     ~Wifi(void) = default;
     Wifi(const Wifi &) = default;
     Wifi &operator=(const Wifi &) = default;
@@ -103,7 +77,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
     }*/
     esp_err_t init(void);
     esp_err_t connect(void);
-    ServerError start_tcp_server(int);
+    ServerError start_tcp_server();
     WifiState get_state(void); // Copy
     static void log(const char *debug_msg);
 };

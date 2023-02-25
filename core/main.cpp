@@ -16,24 +16,21 @@
 
 extern "C" void app_main(void)
 {
-    SsidPassword wifi_ssid_password = {
-        .ssid = "My-SSID",
-        .password = "MY-Password",
-    };
+
+    // TODO: Move all config to a json file for example                     ////////////////////////////////
+    SsidPassword wifi_ssid_password = SsidPassword("My-SSID", "My-Password");
 
     // Router Address: GateWay
-    IpConfig ip_config = {
-        .ip = "xxx.xxx.xxx.xxx",
-        .mask = "xxx.xxx.xxx.xxx",
-        .gw = "xxx.xxx.xxx.xxx",
-    };
+    IpConfig ip_config = IpConfig("xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx");
 
-    StaticIpSetting static_ip_setting = {
-        .ssid_password = wifi_ssid_password,
-        .ip_config = ip_config,
-    };
+    StaticIpSetting static_ip_setting = StaticIpSetting(wifi_ssid_password, ip_config);
 
-    Wifi my_wifi = Wifi(static_ip_setting);
+    ServerConfig tcp_ip_server_config = ServerConfig("test_admin", "test_password", 12345);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    Wifi my_wifi = Wifi(static_ip_setting, tcp_ip_server_config);
+
+    // TODO: Use Wifi State machine -> Wifi::update() (or Wifi::poll)
 
     my_wifi.init_nvs();
     esp_err_t status = my_wifi.init();
@@ -55,7 +52,7 @@ extern "C" void app_main(void)
         {
             vTaskDelay(10); // TMP: TICK
         }
-        my_wifi.start_tcp_server(12345);
+        my_wifi.start_tcp_server();
     }
     else
     {

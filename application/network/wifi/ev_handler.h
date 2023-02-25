@@ -7,29 +7,7 @@
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
 #include "state.h"
-// #include "netiface.h"
-
-// TMP : move to netiface.h
-struct IpConfig
-{
-    const char *ip;
-    const char *mask;
-    const char *gw;
-};
-
-enum class IpSetting
-{
-    StaticIp,
-    /// Dynamic Host Configuration Protocol
-    Dhcp
-};
-
-struct NetworkIface
-{
-    esp_netif_t *netif;
-    IpSetting ip_setting;
-    IpConfig ip_config;
-};
+#include "netiface.h"
 
 class EvHandler
 {

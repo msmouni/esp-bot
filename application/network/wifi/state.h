@@ -28,7 +28,7 @@ struct WifiStateHandler
 {
     WifiState m_state;
 
-    std::mutex m_state_mutex; /// Mutex on State
+    std::mutex m_state_mutex = {}; /// Mutex on State
 
     WifiStateHandler() : m_state(WifiState::NotInitialised) {}
 

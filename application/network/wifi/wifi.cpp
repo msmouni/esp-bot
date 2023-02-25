@@ -46,19 +46,23 @@ void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
 }
 
 // Wifi DHCP Constructor
-Wifi::Wifi(DhcpSetting dhcp_setting)
+Wifi::Wifi(DhcpSetting dhcp_setting, ServerConfig server_config)
 {
 
     create(dhcp_setting.ssid_password);
+
+    m_server_config = server_config;
 
     m_netiface.ip_setting = IpSetting::Dhcp;
 }
 
 // Wifi Static Ip Constructor
-Wifi::Wifi(StaticIpSetting static_ip_setting)
+Wifi::Wifi(StaticIpSetting static_ip_setting, ServerConfig server_config)
 {
 
     create(static_ip_setting.ssid_password);
+
+    m_server_config = server_config;
 
     m_netiface.ip_config = static_ip_setting.ip_config;
 
@@ -205,99 +209,27 @@ esp_err_t Wifi::connect()
     return status;
 }
 
-ServerError Wifi::start_tcp_server(int port)
+ServerError Wifi::start_tcp_server()
 {
-    int serv_sock = socket(AF_INET, SOCK_STREAM, 0);
-    /* NON-BLOCKING FLAG:
-        1- Call the fcntl() API to retrieve the socket descriptor's current flag settings into a local variable.
-        2- In our local variable, set the O_NONBLOCK (non-blocking) flag on. (being careful, of course, not to tamper with the other flags)
-        3- Call the fcntl() API to set the flags for the descriptor to the value in our local variable.
-    */
-    int flags = fcntl(serv_sock, F_GETFL) | O_NONBLOCK;
-    fcntl(serv_sock, F_SETFL, flags);
-
-    /*
-    Note: Now, using {0} to initialize an aggregate like this is basically a trick to 0 the entire thing.
-    This is because when using aggregate initialization you don't have to specify all the members and the spec requires
-    that all unspecified members be default initialized, which means set to 0 for simple types.
-    */
-    struct sockaddr_in server_socket_addr = {0};
-    socklen_t socket_addr_len = sizeof(sockaddr_in);
-
-    char readBuffer[1024] = {0};
-
-    server_socket_addr.sin_family = AF_INET;
-
-    inet_aton(m_netiface.ip_config.ip, &server_socket_addr.sin_addr.s_addr); // inet_aton() converts the Internet host address cp from the IPv4 numbers-and-dots notation into binary form (in network byte order)
-    server_socket_addr.sin_port = htons(port);                               // The htons() function converts the unsigned short integer hostshort from host byte order to network byte order.
-
-    if (serv_sock < 0)
+    if (get_state() == WifiState::Connected)
     {
-        ESP_LOGE(WIFI_TAG, "Failed to create a socket...");
-        return ServerError::CannotCreateSocket;
-    }
+        m_tcp_ip_server = TcpIpServer(ServerSocketDesc(m_netiface.ip_config.ip, m_server_config.socket_port), m_server_config.login);
 
-    if (bind(serv_sock, (struct sockaddr *)&server_socket_addr, socket_addr_len) < 0)
-    {
-        ESP_LOGE(WIFI_TAG, "Failed to bind socket...");
-        return ServerError::CannotCreateSocket;
-    }
+        // TMP
+        while (true)
+        {
 
-    if (listen(serv_sock, 5) < 0)
-    {
-        ESP_LOGE(WIFI_TAG, "Cannot listen on socket...");
-        return ServerError::CannotListenOnSocket;
-    }
+            m_tcp_ip_server.Update();
 
-    ////////////////////////////////
-    struct sockaddr_in client_socket_addr = {0};
+            vTaskDelay(100);
+        }
 
-    // TMP: Blocking
-    ESP_LOGI(WIFI_TAG, "WAITING FOR CLIENT TO CONNECT");
-    int client_socket = -1;
-    while (client_socket < 0)
-    {
-        client_socket = accept(serv_sock, (struct sockaddr *)&client_socket_addr, &socket_addr_len);
-        vTaskDelay(100);
-    }
-    ESP_LOGI(WIFI_TAG, "CLIENT CONNECTED");
-
-    if (client_socket < 0)
-    {
-        ESP_LOGE(WIFI_TAG, "Error connecting to client: %d", client_socket);
-        close(client_socket);
-        return ServerError::ErrorConnectingToClient;
+        return ServerError::None;
     }
     else
     {
-        ESP_LOGI(WIFI_TAG, "Client connected: IP: %s | Port: %d\n", inet_ntoa(client_socket_addr.sin_addr), (int)ntohs(client_socket_addr.sin_port));
+        return ServerError::NotReady;
     }
-
-    int r;
-    // TMP
-    while (strcmp(readBuffer, "quit\n") != 0)
-    {
-
-        // TMP BLOCKING
-
-        bzero(readBuffer, sizeof(readBuffer));
-
-        // ends at b"\n"
-        r = read(client_socket, readBuffer, sizeof(readBuffer) - 1); // receive N_BYTES AT Once
-        // r = recv(serv_sock, readBuffer, sizeof(readBuffer) - 1, 0);  // Receive data from the socket. The return value is a bytes object representing the data received. The maximum amount of data to be received at once is specified by bufsize.
-
-        if (r > 0)
-        {
-            /*
-            You can either add a null character after your termination character, and your printf will work,
-            or you can add a '.*' in your printf statement and provide the length*/
-            printf("%.*s", r, readBuffer);
-        }
-
-        vTaskDelay(100);
-    }
-
-    return ServerError::None;
 }
 
 WifiState Wifi::get_state()
