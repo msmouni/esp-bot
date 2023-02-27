@@ -127,5 +127,21 @@ void TcpIpServer::TryToRecvMsg()
 
             // bzero(readBuffer, sizeof(readBuffer));
         }
+        else if (r == 0)
+        {
+            /* the client socket is interrupted */
+            ESP_LOGI(SERVER_TAG, "Connexion with Client_%d interrupted", client_idx);
+
+            close(m_clients_sockets[client_idx]);
+
+            // Clear the client  from the list
+            for (int cmpt = client_idx; cmpt < m_nb_connected_clients; cmpt++)
+            {
+                // @todo: CLIENT ID
+                m_clients_sockets[cmpt] = m_clients_sockets[cmpt + 1];
+                m_clients_addr[cmpt] = m_clients_addr[cmpt + 1];
+                m_nb_connected_clients -= 1;
+            }
+        }
     }
 }
