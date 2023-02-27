@@ -13,13 +13,14 @@
 */
 enum class WifiState
 {
-    NotInitialised,
-    Initialised,
+    NotInitialized,
+    Initialized,
     ReadyToConnect,
     Connecting,
     SettingIp,
     WaitingForIp,
     Connected,
+    TcpIpServerRunning,
     Disconnected,
     Error,
 };
@@ -30,7 +31,7 @@ struct WifiStateHandler
 
     std::mutex m_state_mutex = {}; /// Mutex on State
 
-    WifiStateHandler() : m_state(WifiState::NotInitialised) {}
+    WifiStateHandler() : m_state(WifiState::NotInitialized) {}
 
     void change_state(WifiState new_state)
     {

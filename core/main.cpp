@@ -1,5 +1,7 @@
 #include "main.h"
 
+static MainProgram main_prog;
+
 /*
     Name mangling:
         extern "C" makes a function-name in C++ have C linkage (compiler does not mangle the name)
@@ -16,46 +18,5 @@
 
 extern "C" void app_main(void)
 {
-
-    // TODO: Move all config to a json file for example                     ////////////////////////////////
-    SsidPassword wifi_ssid_password = SsidPassword("My-SSID", "My-Password");
-
-    // Router Address: GateWay
-    IpConfig ip_config = IpConfig("xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx");
-
-    StaticIpSetting static_ip_setting = StaticIpSetting(wifi_ssid_password, ip_config);
-
-    ServerConfig tcp_ip_server_config = ServerConfig("test_admin", "test_password", 12345);
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    Wifi my_wifi = Wifi(static_ip_setting, tcp_ip_server_config);
-
-    // TODO: Use Wifi State machine -> Wifi::update() (or Wifi::poll)
-
-    my_wifi.init_nvs();
-    esp_err_t status = my_wifi.init();
-
-    if (status == ESP_OK)
-    {
-        // TMP
-        while (my_wifi.get_state() != WifiState::ReadyToConnect)
-        {
-            printf("Init ... %d", (int)my_wifi.get_state());
-            vTaskDelay(10); // TMP: TICK
-        }
-
-        my_wifi.log("CONNECT...");
-        my_wifi.connect();
-
-        // TMP
-        while (my_wifi.get_state() != WifiState::Connected)
-        {
-            vTaskDelay(10); // TMP: TICK
-        }
-        my_wifi.start_tcp_server();
-    }
-    else
-    {
-        my_wifi.log("ERROR INIT");
-    }
+    main_prog.run();
 }

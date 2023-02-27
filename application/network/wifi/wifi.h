@@ -6,26 +6,18 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
-#include "lwip/err.h"
-#include "lwip/sockets.h"
-#include "lwip/sys.h"
-#include "lwip/netdb.h"
-#include "lwip/dns.h"
 #include <algorithm>
 #include <cstring>
 #include "ev_handler.h"
 #include "server.h"
+#include "result.h"
 
 class Wifi
 {
 private:
-    /*// since C++11: The constexpr specifier declares that it is possible to evaluate the value of the function or variable at compile time.
-    constexpr static const char *ssid{"MyWifiSsid"};
-    constexpr static const char *password{"MyWifiPassword"};*/
-
     SsidPassword m_ssid_password;
 
+    // The constexpr specifier declares that it is possible to evaluate the value of the function or variable at compile time.
     // Debug Tag
     constexpr static const char *WIFI_TAG = "WIFI";
 
@@ -47,9 +39,14 @@ private:
 
     static esp_err_t get_mac(void);
 
+    esp_err_t init(void);
+    esp_err_t connect(void);
+    ServerError start_tcp_server();
+
+    WifiError m_error = {};
+
     TcpIpServer m_tcp_ip_server;
     ServerConfig m_server_config;
-    //////////////////////////////////////  MOVE TO IpServer class
     NetworkIface m_netiface = {};
 
 public:
@@ -70,14 +67,12 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
     Wifi(Wifi &&) = default;
     Wifi &operator=(Wifi &&) = default;
 
-    static esp_err_t init_nvs(void);
     /*constexpr static const char *get_mac_cstr(void)
     {
         return mac_addr_cstr;
     }*/
-    esp_err_t init(void);
-    esp_err_t connect(void);
-    ServerError start_tcp_server();
+
+    WifiResult Update(void);
     WifiState get_state(void); // Copy
     static void log(const char *debug_msg);
 };

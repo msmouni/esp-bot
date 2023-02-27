@@ -17,7 +17,7 @@ void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
 {
 
     /*// Check if the MAC cstring currently begins with a
-    //   nullptr, i.e. is default initialised, not set
+    //   nullptr, i.e. is default initialized, not set
     if (!get_mac_cstr()[0])
     {
         // Get the MAC and if this fails restart
@@ -80,39 +80,15 @@ void Wifi::handle_event(void *arg, esp_event_base_t event_base,
     m_ev_handler.handle(arg, event_base, event_id, event_data);
 }
 
-// initialize storage
-esp_err_t Wifi::init_nvs()
-{
-    esp_err_t ret = nvs_flash_init();
-
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ret = nvs_flash_erase();
-
-        if (ret == ESP_OK)
-        {
-            ret = nvs_flash_init();
-        }
-    }
-
-    return ret;
-}
-
 esp_err_t Wifi::init()
 {
     esp_err_t status = ESP_OK;
 
-    if (WifiState::NotInitialised == get_state())
+    if (WifiState::NotInitialized == get_state())
     {
 
         // initialize the esp network interface
         status = esp_netif_init();
-
-        // initialize default esp event loop
-        if (ESP_OK == status)
-        {
-            status = esp_event_loop_create_default();
-        }
 
         // create wifi station in the wifi driver
         m_netiface.netif = esp_netif_create_default_wifi_sta();
@@ -170,10 +146,10 @@ esp_err_t Wifi::init()
             status = esp_wifi_start();
         }
 
-        if ((ESP_OK == status) && (WifiState::NotInitialised == get_state()))
+        if ((ESP_OK == status) && (WifiState::NotInitialized == get_state()))
         {
             // In case Event happens before
-            change_state(WifiState::Initialised);
+            change_state(WifiState::Initialized);
         }
 
         ESP_LOGI(WIFI_TAG, "STA initialization complete");
@@ -215,21 +191,83 @@ ServerError Wifi::start_tcp_server()
     {
         m_tcp_ip_server = TcpIpServer(ServerSocketDesc(m_netiface.ip_config.ip, m_server_config.socket_port), m_server_config.login);
 
-        // TMP
-        while (true)
-        {
-
-            m_tcp_ip_server.Update();
-
-            vTaskDelay(100);
-        }
-
         return ServerError::None;
     }
     else
     {
         return ServerError::NotReady;
     }
+}
+
+WifiResult Wifi::Update()
+{
+    switch (m_state_handler.get_state())
+    {
+    case WifiState::NotInitialized:
+    {
+        m_error.esp_err = init();
+
+        if (m_error.esp_err != ESP_OK)
+        {
+            ESP_LOGE(WIFI_TAG, "Initialization error");
+            m_state_handler.change_state(WifiState::Error);
+            return WifiResult::Err;
+        }
+
+        break;
+    }
+    case WifiState::ReadyToConnect:
+    {
+        m_error.esp_err = connect();
+
+        if (m_error.esp_err != ESP_OK)
+        {
+            ESP_LOGE(WIFI_TAG, "Wifi Connexion error");
+            m_state_handler.change_state(WifiState::Error);
+            return WifiResult::Err;
+        }
+
+        break;
+    }
+    case WifiState::Connected:
+    {
+        m_error.server_err = start_tcp_server();
+
+        if ((m_error.esp_err != ESP_OK) | (m_error.server_err != ServerError::None))
+        {
+            ESP_LOGE(WIFI_TAG, "Error while starting TCP/IP server");
+            m_state_handler.change_state(WifiState::Error);
+            return WifiResult::Err;
+        }
+        else
+        {
+            m_state_handler.change_state(WifiState::TcpIpServerRunning);
+        }
+
+        break;
+    }
+    case WifiState::TcpIpServerRunning:
+    {
+        m_error.server_err = m_tcp_ip_server.Update();
+
+        if ((m_error.esp_err != ESP_OK) | (m_error.server_err != ServerError::None))
+        {
+            ESP_LOGE(WIFI_TAG, "Error while running TCP/IP server");
+            m_state_handler.change_state(WifiState::Error);
+            return WifiResult::Err;
+        }
+
+        break;
+    }
+    case WifiState::Error:
+    {
+        return WifiResult::Err;
+    }
+    default:
+        break;
+    }
+
+    return WifiResult::Ok;
 }
 
 WifiState Wifi::get_state()
