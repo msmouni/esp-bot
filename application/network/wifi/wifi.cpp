@@ -21,7 +21,7 @@ void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
     if (!get_mac_cstr()[0])
     {
         // Get the MAC and if this fails restart
-        if (ESP_OK != get_mac())
+        if (ESP_OK != getMac())
             esp_restart();
     }*/
 
@@ -69,13 +69,13 @@ Wifi::Wifi(StaticIpSetting static_ip_setting, ServerConfig server_config)
     m_netiface.ip_setting = IpSetting::StaticIp;
 }
 
-void Wifi::change_state(WifiState new_state)
+void Wifi::changeState(WifiState new_state)
 {
-    m_state_handler.change_state(new_state);
+    m_state_handler.changeState(new_state);
 }
 
-void Wifi::handle_event(void *arg, esp_event_base_t event_base,
-                        int32_t event_id, void *event_data)
+void Wifi::handleEvent(void *arg, esp_event_base_t event_base,
+                       int32_t event_id, void *event_data)
 {
     m_ev_handler.handle(arg, event_base, event_id, event_data);
 }
@@ -84,7 +84,7 @@ esp_err_t Wifi::init()
 {
     esp_err_t status = ESP_OK;
 
-    if (WifiState::NotInitialized == get_state())
+    if (WifiState::NotInitialized == getState())
     {
 
         // initialize the esp network interface
@@ -110,7 +110,7 @@ esp_err_t Wifi::init()
         {
             status = esp_event_handler_instance_register(WIFI_EVENT,
                                                          ESP_EVENT_ANY_ID,
-                                                         &handle_event,
+                                                         &handleEvent,
                                                          &m_netiface,
                                                          NULL);
         }
@@ -119,7 +119,7 @@ esp_err_t Wifi::init()
         {
             status = esp_event_handler_instance_register(IP_EVENT,
                                                          ESP_EVENT_ANY_ID,
-                                                         &handle_event,
+                                                         &handleEvent,
                                                          m_netiface.netif,
                                                          NULL);
         }
@@ -146,15 +146,15 @@ esp_err_t Wifi::init()
             status = esp_wifi_start();
         }
 
-        if ((ESP_OK == status) && (WifiState::NotInitialized == get_state()))
+        if ((ESP_OK == status) && (WifiState::NotInitialized == getState()))
         {
             // In case Event happens before
-            change_state(WifiState::Initialized);
+            changeState(WifiState::Initialized);
         }
 
         ESP_LOGI(WIFI_TAG, "STA initialization complete");
     }
-    else if (WifiState::Error == get_state())
+    else if (WifiState::Error == getState())
     {
         status = ESP_FAIL;
     }
@@ -167,14 +167,14 @@ esp_err_t Wifi::connect()
 
     esp_err_t status = ESP_OK;
 
-    switch (get_state())
+    switch (getState())
     {
     case WifiState::ReadyToConnect:
         status = esp_wifi_connect();
 
         if (ESP_OK == status)
         {
-            change_state(WifiState::Connecting);
+            changeState(WifiState::Connecting);
         }
         break;
 
@@ -185,9 +185,9 @@ esp_err_t Wifi::connect()
     return status;
 }
 
-ServerError Wifi::start_tcp_server()
+ServerError Wifi::startTcpServer()
 {
-    if (get_state() == WifiState::Connected)
+    if (getState() == WifiState::Connected)
     {
         m_tcp_ip_server = TcpIpServer(ServerSocketDesc(m_netiface.ip_config.ip, m_server_config.socket_port), m_server_config.login);
 
@@ -199,9 +199,9 @@ ServerError Wifi::start_tcp_server()
     }
 }
 
-WifiResult Wifi::Update()
+WifiResult Wifi::update()
 {
-    switch (m_state_handler.get_state())
+    switch (m_state_handler.getState())
     {
     case WifiState::NotInitialized:
     {
@@ -210,7 +210,7 @@ WifiResult Wifi::Update()
         if (m_error.esp_err != ESP_OK)
         {
             ESP_LOGE(WIFI_TAG, "Initialization error");
-            m_state_handler.change_state(WifiState::Error);
+            m_state_handler.changeState(WifiState::Error);
             return WifiResult::Err;
         }
 
@@ -223,7 +223,7 @@ WifiResult Wifi::Update()
         if (m_error.esp_err != ESP_OK)
         {
             ESP_LOGE(WIFI_TAG, "Wifi Connexion error");
-            m_state_handler.change_state(WifiState::Error);
+            m_state_handler.changeState(WifiState::Error);
             return WifiResult::Err;
         }
 
@@ -231,29 +231,29 @@ WifiResult Wifi::Update()
     }
     case WifiState::Connected:
     {
-        m_error.server_err = start_tcp_server();
+        m_error.server_err = startTcpServer();
 
         if ((m_error.esp_err != ESP_OK) | (m_error.server_err != ServerError::None))
         {
             ESP_LOGE(WIFI_TAG, "Error while starting TCP/IP server");
-            m_state_handler.change_state(WifiState::Error);
+            m_state_handler.changeState(WifiState::Error);
             return WifiResult::Err;
         }
         else
         {
-            m_state_handler.change_state(WifiState::TcpIpServerRunning);
+            m_state_handler.changeState(WifiState::TcpIpServerRunning);
         }
 
         break;
     }
     case WifiState::TcpIpServerRunning:
     {
-        m_error.server_err = m_tcp_ip_server.Update();
+        m_error.server_err = m_tcp_ip_server.update();
 
         if ((m_error.esp_err != ESP_OK) | (m_error.server_err != ServerError::None))
         {
             ESP_LOGE(WIFI_TAG, "Error while running TCP/IP server");
-            m_state_handler.change_state(WifiState::Error);
+            m_state_handler.changeState(WifiState::Error);
             return WifiResult::Err;
         }
 
@@ -270,10 +270,10 @@ WifiResult Wifi::Update()
     return WifiResult::Ok;
 }
 
-WifiState Wifi::get_state()
+WifiState Wifi::getState()
 {
     // Copy
-    return m_state_handler.get_state();
+    return m_state_handler.getState();
 }
 
 void Wifi::log(const char *debug_msg)

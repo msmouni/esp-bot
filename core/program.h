@@ -11,7 +11,7 @@ private:
 
     MainState m_state;
 
-    esp_err_t init_nvs();
+    esp_err_t initNvs();
 
     esp_err_t setup(void);
 

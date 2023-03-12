@@ -6,7 +6,7 @@
 //     m_login = login;
 // }
 
-ServerError TcpIpServer::Update()
+ServerError TcpIpServer::update()
 {
     switch (m_state)
     {
@@ -68,10 +68,10 @@ ServerError TcpIpServer::Update()
     }
     case ServerState::Running:
     {
-        TryToConnetClient();
 
-        TryToRecvMsg();
+        tryToConnetClient();
 
+        tryToRecvMsg();
         break;
     }
     default:
@@ -83,7 +83,7 @@ ServerError TcpIpServer::Update()
     return ServerError::None;
 }
 
-void TcpIpServer::TryToConnetClient()
+void TcpIpServer::tryToConnetClient()
 {
     if (m_nb_connected_clients < NB_ALLOWED_CLIENTS)
     {
@@ -108,7 +108,7 @@ void TcpIpServer::TryToConnetClient()
 }
 
 // TMP STORE MSGs IN BUFFER
-void TcpIpServer::TryToRecvMsg()
+void TcpIpServer::tryToRecvMsg()
 {
     for (int client_idx = 0; client_idx <= m_nb_connected_clients; client_idx++)
     {

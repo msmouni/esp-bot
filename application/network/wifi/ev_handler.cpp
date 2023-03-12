@@ -13,11 +13,11 @@ void EvHandler::handle(void *arg, esp_event_base_t event_base,
 {
     if (WIFI_EVENT == event_base)
     {
-        return wifi_event_handler(arg, event_base, event_id, event_data);
+        return wifiEventHandler(arg, event_base, event_id, event_data);
     }
     else if (IP_EVENT == event_base)
     {
-        return ip_event_handler(arg, event_base, event_id, event_data);
+        return ipEventHandler(arg, event_base, event_id, event_data);
     }
     else
     {
@@ -25,7 +25,7 @@ void EvHandler::handle(void *arg, esp_event_base_t event_base,
     }
 }
 
-esp_err_t EvHandler::set_dns_server_infos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type)
+esp_err_t EvHandler::setDnsServerInfos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type)
 {
     if (addr && (addr != IPADDR_NONE))
     {
@@ -37,7 +37,7 @@ esp_err_t EvHandler::set_dns_server_infos(esp_netif_t *netif, uint32_t addr, esp
     return ESP_OK;
 }
 
-void EvHandler::set_static_ip(esp_netif_t *netif, IpConfig *ip_config)
+void EvHandler::setStaticIp(esp_netif_t *netif, IpConfig *ip_config)
 {
     if (esp_netif_dhcpc_stop(netif) != ESP_OK)
     {
@@ -57,13 +57,13 @@ void EvHandler::set_static_ip(esp_netif_t *netif, IpConfig *ip_config)
 
     // As DNS
     // Router Address: GateWay
-    set_dns_server_infos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_MAIN);
-    set_dns_server_infos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_BACKUP);
+    setDnsServerInfos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_MAIN);
+    setDnsServerInfos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_BACKUP);
 }
 
 // event handler for wifi events
-void EvHandler::wifi_event_handler(void *arg, esp_event_base_t event_base,
-                                   int32_t event_id, void *event_data)
+void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
+                                 int32_t event_id, void *event_data)
 {
 
     if (WIFI_EVENT == event_base)
@@ -75,7 +75,7 @@ void EvHandler::wifi_event_handler(void *arg, esp_event_base_t event_base,
         case WIFI_EVENT_STA_START:
         {
             ESP_LOGI(M_LOG_TAG, "Wifi STA started");
-            m_state_handler->change_state(WifiState::ReadyToConnect);
+            m_state_handler->changeState(WifiState::ReadyToConnect);
 
             break;
         }
@@ -90,15 +90,15 @@ void EvHandler::wifi_event_handler(void *arg, esp_event_base_t event_base,
             {
             case IpSetting::StaticIp:
             {
-                m_state_handler->change_state(WifiState::SettingIp);
+                m_state_handler->changeState(WifiState::SettingIp);
 
-                set_static_ip(network_iface->netif, &network_iface->ip_config);
+                setStaticIp(network_iface->netif, &network_iface->ip_config);
 
                 break;
             }
             case IpSetting::Dhcp:
             {
-                m_state_handler->change_state(WifiState::WaitingForIp);
+                m_state_handler->changeState(WifiState::WaitingForIp);
             }
 
             default:
@@ -116,7 +116,7 @@ void EvHandler::wifi_event_handler(void *arg, esp_event_base_t event_base,
 
                 if (ESP_OK == esp_wifi_connect())
                 {
-                    m_state_handler->change_state(WifiState::Connecting);
+                    m_state_handler->changeState(WifiState::Connecting);
 
                     m_retry_num++;
                 }
@@ -124,7 +124,7 @@ void EvHandler::wifi_event_handler(void *arg, esp_event_base_t event_base,
             else
             {
                 ESP_LOGE(M_LOG_TAG, "Unable to connect to AP after %i attemps", MAX_FAILURES);
-                m_state_handler->change_state(WifiState::Error);
+                m_state_handler->changeState(WifiState::Error);
             }
         }
 
@@ -135,8 +135,8 @@ void EvHandler::wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-void EvHandler::ip_event_handler(void *arg, esp_event_base_t event_base,
-                                 int32_t event_id, void *event_data)
+void EvHandler::ipEventHandler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
 {
 
     if (IP_EVENT == event_base)
@@ -162,14 +162,14 @@ void EvHandler::ip_event_handler(void *arg, esp_event_base_t event_base,
 
             m_retry_num = 0;
 
-            m_state_handler->change_state(WifiState::Connected);
+            m_state_handler->changeState(WifiState::Connected);
             break;
         }
 
         case IP_EVENT_STA_LOST_IP:
         {
             ESP_LOGI(M_LOG_TAG, "STA LOST IP");
-            m_state_handler->change_state(WifiState::WaitingForIp);
+            m_state_handler->changeState(WifiState::WaitingForIp);
             break;
         }
 

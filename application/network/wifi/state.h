@@ -33,14 +33,14 @@ struct WifiStateHandler
 
     WifiStateHandler() : m_state(WifiState::NotInitialized) {}
 
-    void change_state(WifiState new_state)
+    void changeState(WifiState new_state)
     {
         std::lock_guard<std::mutex> state_guard(m_state_mutex);
         m_state = new_state;
     }
 
     // A Copy
-    WifiState get_state()
+    WifiState getState()
     {
         std::lock_guard<std::mutex> state_guard(m_state_mutex);
         return m_state;

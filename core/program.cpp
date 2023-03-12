@@ -33,14 +33,14 @@ esp_err_t MainProgram::setup()
     if (ESP_OK == status)
     {
         ESP_LOGI(LOG_TAG, "Initializing NVS");
-        status = init_nvs();
+        status = initNvs();
     }
 
     return status;
 };
 
 // initialize storage
-esp_err_t MainProgram::init_nvs()
+esp_err_t MainProgram::initNvs()
 {
     esp_err_t res = nvs_flash_init();
 
@@ -99,7 +99,7 @@ void MainProgram::update()
 {
     if (m_state == MainState::Running)
     {
-        if (m_wifi->Update() == WifiResult::Err)
+        if (m_wifi->update() == WifiResult::Err)
         {
             m_state = MainState::Error;
         }

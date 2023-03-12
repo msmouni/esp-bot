@@ -22,7 +22,7 @@ private:
     constexpr static const char *WIFI_TAG = "WIFI";
 
     static WifiStateHandler m_state_handler;
-    static void change_state(WifiState);
+    static void changeState(WifiState);
 
     // Configuration
     static wifi_init_config_t m_wifi_init_config;
@@ -34,14 +34,14 @@ private:
 
     static EvHandler m_ev_handler;
 
-    static void handle_event(void *arg, esp_event_base_t event_base,
-                             int32_t event_id, void *event_data);
+    static void handleEvent(void *arg, esp_event_base_t event_base,
+                            int32_t event_id, void *event_data);
 
-    static esp_err_t get_mac(void);
+    static esp_err_t getMac(void);
 
     esp_err_t init(void);
     esp_err_t connect(void);
-    ServerError start_tcp_server();
+    ServerError startTcpServer();
 
     WifiError m_error = {};
 
@@ -72,7 +72,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
         return mac_addr_cstr;
     }*/
 
-    WifiResult Update(void);
-    WifiState get_state(void); // Copy
+    WifiResult update(void);
+    WifiState getState(void); // Copy
     static void log(const char *debug_msg);
 };

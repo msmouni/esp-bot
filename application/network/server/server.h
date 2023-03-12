@@ -40,14 +40,14 @@ private:
     ServerError m_error = ServerError::None;
 
     // Try to connet clients
-    void TryToConnetClient();
+    void tryToConnetClient();
 
     // Message receive of a given size
-    void TryToRecvMsg();
+    void tryToRecvMsg();
 
 public:
     // (ServerSocketId, ServerLogin)
     TcpIpServer(ServerSocketDesc socket_desc = {}, ServerLogin login = {}) : m_login(login), m_socket_desc(socket_desc){};
 
-    ServerError Update();
+    ServerError update();
 };
