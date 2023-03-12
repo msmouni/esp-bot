@@ -1,10 +1,22 @@
 #include "server.h"
 
-// TcpIpServer::TcpIpServer(ServerSocketDesc socket_desc = {}, ServerLogin login = {})
-// {
-//     m_socket_desc = socket_desc;
-//     m_login = login;
-// }
+void setSocketNonBlocking(int socket_desc)
+{
+    /* NON-BLOCKING FLAG:
+        1- Call the fcntl() API to retrieve the socket descriptor's current flag settings into a local variable.
+        2- In our local variable, set the O_NONBLOCK (non-blocking) flag on. (being careful, of course, not to tamper with the other flags)
+        3- Call the fcntl() API to set the flags for the descriptor to the value in our local variable.
+    */
+    int flags = fcntl(socket_desc, F_GETFL) | O_NONBLOCK;
+    fcntl(socket_desc, F_SETFL, flags);
+}
+
+void TcpIpServer::start(ServerSocketDesc socket_desc, ServerLogin login)
+{
+    m_socket_desc = socket_desc;
+    m_login = login;
+    m_state = ServerState::Uninitialized;
+}
 
 ServerError TcpIpServer::update()
 {
@@ -22,13 +34,7 @@ ServerError TcpIpServer::update()
             return ServerError::CannotCreateSocket;
         }
 
-        /* NON-BLOCKING FLAG:
-            1- Call the fcntl() API to retrieve the socket descriptor's current flag settings into a local variable.
-            2- In our local variable, set the O_NONBLOCK (non-blocking) flag on. (being careful, of course, not to tamper with the other flags)
-            3- Call the fcntl() API to set the flags for the descriptor to the value in our local variable.
-        */
-        int flags = fcntl(m_socket, F_GETFL) | O_NONBLOCK;
-        fcntl(m_socket, F_SETFL, flags);
+        setSocketNonBlocking(m_socket);
 
         ESP_LOGI(SERVER_TAG, "TCP/IP Server Created");
 
@@ -71,7 +77,12 @@ ServerError TcpIpServer::update()
 
         tryToConnetClient();
 
+        // tryToSendMsg();
+
+        m_clients.update();
+
         tryToRecvMsg();
+
         break;
     }
     default:
@@ -85,8 +96,14 @@ ServerError TcpIpServer::update()
 
 void TcpIpServer::tryToConnetClient()
 {
-    if (m_nb_connected_clients < NB_ALLOWED_CLIENTS)
+    Option<sockaddr_in *> opt_next_client_addr = m_clients.getNextClientAddr();
+
+    if (opt_next_client_addr
+            .isSome())
     {
+        // (m_nb_connected_clients < NB_ALLOWED_CLIENTS)
+
+        sockaddr_in *next_client_addr = opt_next_client_addr.getData();
 
         /*
         On success, these system calls return a file descriptor for the
@@ -94,15 +111,15 @@ void TcpIpServer::tryToConnetClient()
         returned, errno is set to indicate the error, and addrlen is left
         unchanged.
         */
-        int client_socket = accept(m_socket, (struct sockaddr *)&m_clients_addr[m_nb_connected_clients], &m_socket_addr_len);
+        int client_socket = accept(m_socket, (sockaddr *)next_client_addr, &m_socket_addr_len);
 
         if (client_socket >= 0)
         {
-            m_clients_sockets[m_nb_connected_clients] = client_socket;
+            setSocketNonBlocking(client_socket);
 
-            ESP_LOGI(SERVER_TAG, "Client connected: IP: %s | Port: %d\n", inet_ntoa(m_clients_addr[m_nb_connected_clients].sin_addr), (int)ntohs(m_clients_addr[m_nb_connected_clients].sin_port));
+            m_clients.addClient(client_socket);
 
-            m_nb_connected_clients += 1;
+            ESP_LOGI(SERVER_TAG, "Client connected: IP: %s | Port: %d\n", inet_ntoa(next_client_addr->sin_addr), (int)ntohs(next_client_addr->sin_port));
         }
     }
 }
@@ -110,38 +127,36 @@ void TcpIpServer::tryToConnetClient()
 // TMP STORE MSGs IN BUFFER
 void TcpIpServer::tryToRecvMsg()
 {
-    for (int client_idx = 0; client_idx <= m_nb_connected_clients; client_idx++)
+    // TMP
+    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvMsg();
+
+    if (opt_msg.isSome())
     {
+        // TMP
+        uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
 
-        // ends at b"\n"
-        int r = read(m_clients_sockets[client_idx], m_recv_buffer, MAX_MSG_SIZE); // receive N_BYTES AT Once
-        // r = recv(serv_sock, readBuffer, sizeof(readBuffer) - 1, 0);  // Receive data from the socket. The return value is a bytes object representing the data received. The maximum amount of data to be received at once is specified by bufsize.
+        ServerFrame<MAX_MSG_SIZE> msg = opt_msg.getData();
 
-        if (r > 0)
-        {
-            /*
-            You can either add a null character after your termination character, and your printf will work,
-            or you can add a '.*' in your printf statement and provide the length*/
-            // printf("%.*s", r, m_recv_buffer);
-            ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", client_idx, r, m_recv_buffer);
+        msg.debug();
 
-            // bzero(readBuffer, sizeof(readBuffer));
-        }
-        else if (r == 0)
-        {
-            /* the client socket is interrupted */
-            ESP_LOGI(SERVER_TAG, "Connexion with Client_%d interrupted", client_idx);
+        msg.toBytes(m_recv_buffer);
 
-            close(m_clients_sockets[client_idx]);
+        tryToSendMsg();
 
-            // Clear the client  from the list
-            for (int cmpt = client_idx; cmpt < m_nb_connected_clients; cmpt++)
-            {
-                // @todo: CLIENT ID
-                m_clients_sockets[cmpt] = m_clients_sockets[cmpt + 1];
-                m_clients_addr[cmpt] = m_clients_addr[cmpt + 1];
-                m_nb_connected_clients -= 1;
-            }
-        }
+        ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
     }
+}
+
+void TcpIpServer::tryToSendMsg()
+{
+    // TMP
+    uint8_t data[MAX_MSG_SIZE - 5] = {0};
+    data[0] = 1;
+    data[1] = 2;
+    data[2] = 3;
+    data[3] = 4;
+    data[4] = 5;
+    ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(1, 5, data);
+
+    m_clients.sendMsg(status_frame);
 }
