@@ -26,7 +26,19 @@ namespace option
         bool isNone(void) { return (m_type == DataType::None); }
 
         // Note: make sure to check if isSome() before trying to getData()
-        T getData(void) { return m_data; }
+        T &getData(void) { return m_data; }
+
+        void setData(T data)
+        {
+            m_data = data;
+            m_type = DataType::Some;
+        }
+
+        void removeData()
+        {
+            m_data = {};
+            m_type = DataType::None;
+        }
     };
 }
 

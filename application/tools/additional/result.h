@@ -25,10 +25,22 @@ namespace result
         bool isErr(void) { return (m_type == DataType::Err); }
 
         // Note: make sure to check if isOk() before trying to getData()
-        T getData(void) { return m_data; }
+        T &getData(void) { return m_data; }
 
         // Note: make sure to check if isErr() before trying to getErr()
-        E getErr(void) { return m_error; }
+        E &getErr(void) { return m_error; }
+
+        void setData(T data)
+        {
+            m_data = data;
+            m_type = DataType::Ok;
+        }
+
+        void setErr(E err)
+        {
+            m_error = err;
+            m_type = DataType::Err;
+        }
     };
 }
 
