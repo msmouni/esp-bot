@@ -1,6 +1,10 @@
+#ifndef TCP_IP_CLIENTS
+#define TCP_IP_CLIENTS
+
 #include "client.h"
 #include "circular_buffer.h"
 #include "error.h"
+#include "login.h"
 
 /// Only one client have state `TakingControl` and can send messages to server
 /// The other clients can only receive messages from server
@@ -10,6 +14,9 @@ class Clients
 private:
     // Debug Tag
     constexpr static const char *CLIENTS_TAG = "CLIENTS";
+
+    Option<ServerLogin> m_server_login;
+
     uint8_t m_nb_connected_clients; // number of connected clients
     uint32_t m_client_id_tracker;
 
@@ -29,11 +36,13 @@ private:
 public:
     Clients() : m_nb_connected_clients(0), m_client_id_tracker(0)
     {
+        m_server_login = Option<ServerLogin>();
         m_client_taking_control = Option<uint8_t>();
     };
     // ~Clients();
     // Clients(const Clients &) = delete;
     // Clients &operator=(const Clients &) = delete;
+    void setServerLogin(ServerLogin login);
     Option<struct sockaddr_in *> getNextClientAddr(void);
     void addClient(int);
     void update();
@@ -60,6 +69,12 @@ Option<struct sockaddr_in *> Clients<NbAllowedClients, MaxFrameLen>::getClientAd
 }
 
 template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+void Clients<NbAllowedClients, MaxFrameLen>::setServerLogin(ServerLogin login)
+{
+    m_server_login.setData(login);
+}
+
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
 Option<struct sockaddr_in *> Clients<NbAllowedClients, MaxFrameLen>::getNextClientAddr(void)
 {
     return getClientAddr(m_nb_connected_clients);
@@ -69,9 +84,6 @@ template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::addClient(int socket_desc)
 {
     m_clients[m_nb_connected_clients].connect(m_client_id_tracker, socket_desc);
-
-    // TMP
-    m_client_taking_control = Option<uint8_t>(m_nb_connected_clients); // TMP: Last one
 
     m_nb_connected_clients += 1;
     m_client_id_tracker += 1;
@@ -84,6 +96,11 @@ void Clients<NbAllowedClients, MaxFrameLen>::deleteClient(uint8_t client_index)
     {
         /* the client socket is interrupted */
         ESP_LOGI(CLIENTS_TAG, "Connexion with Client_%d interrupted", m_clients[client_index].getId());
+
+        if (m_clients[client_index].getState() == ClientState::TakingControl)
+        {
+            m_client_taking_control.removeData();
+        }
 
         m_clients[client_index].disconnect();
 
@@ -119,12 +136,17 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendMsg(ServerFrame<MaxFram
 template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::update()
 {
+
     Option<ServerFrame<MaxFrameLen>> opt_msg = tx_frames_buffer.get();
-    if (opt_msg.isSome())
+
+    for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
     {
+        ClientState client_state = m_clients[client_idx].getState();
+
         // Send Messages to all authentified clients
-        for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
+        if ((opt_msg.isSome()) & ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl)))
         {
+
             Result<int, ClientError> res = m_clients[client_idx].tryToSendMsg(opt_msg.getData());
             if (res
                     .isErr())
@@ -132,21 +154,13 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                 deleteClient(client_idx);
             }
         }
-    }
 
-    // Receive Messages from client taking control
-    if (m_client_taking_control
-            .isSome())
-    {
-        uint8_t client_index = m_client_taking_control.getData();
-
-        Result<Option<ServerFrame<MaxFrameLen>>, ClientError> res = m_clients[client_index].tryToRecvMsg();
-
+        // Receive Msg from all clients
+        Result<Option<ServerFrame<MaxFrameLen>>, ClientError> res = m_clients[client_idx].tryToRecvMsg();
         if (res
                 .isErr())
         {
-            deleteClient(client_index);
-            m_client_taking_control = Option<uint8_t>();
+            deleteClient(client_idx);
         }
         else
         {
@@ -154,7 +168,91 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
 
             if (opt_msg.isSome())
             {
-                rx_frames_buffer.push(opt_msg.getData());
+
+                ServerFrame<MaxFrameLen> msg = opt_msg.getData();
+
+                switch (client_state)
+                {
+                case ClientState::Connected:
+                {
+                    if (m_server_login.isSome())
+                    {
+                        if (msg.getId() == ServerFrameId::Authentification)
+                        {
+                            // Compare to login
+                            // '{super_admin:super_password}\0': [123, 115, 117, 112, 101, 114, 95, 97, 100, 109, 105, 110, 58, 115, 117, 112, 101, 114, 95, 112, 97, 115, 115, 119, 111, 114, 100, 125, 0]
+                            // -> [0, 0, 0, 1, 29, 123, 115, 117, 112, 101, 114, 95, 97, 100, 109, 105, 110, 58, 115, 117, 112, 101, 114, 95, 112, 97, 115, 115, 119, 111, 114, 100, 125, 0]
+
+                            ServerLogin &server_login = m_server_login.getData();
+
+                            // TO VERIFY: reinterpret_cast
+                            char *msg_data = reinterpret_cast<char *>(msg.getData());
+
+                            switch (server_login.check(msg_data))
+                            {
+                            case LoginResult::Client:
+                            {
+                                // ESP_LOGI(CLIENTS_TAG, "Client_%d(%s:%d) Logged as Client\n", client_idx, inet_ntoa(m_clients[0].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                printf("Client_%d(%s:%d) Logged as Client\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                m_clients[client_idx].login();
+                                break;
+                            }
+                            case LoginResult::SuperClient:
+                            {
+                                if (m_client_taking_control.isNone())
+                                {
+                                    printf("Client_%d(%s:%d) Logged as SuperClient\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                    m_clients[client_idx].takeControl();
+
+                                    m_client_taking_control.setData(client_idx);
+                                }
+                                break;
+                            }
+                            case LoginResult::WrongLogin:
+                            {
+                                printf("Client_%d(%s:%d) tried to Log using wrong Login\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+
+                                break;
+                            }
+
+                            default:
+                                break;
+                            }
+                        }
+                    }
+
+                    break;
+                }
+                case ClientState::Authenticated:
+                {
+                    if ((msg.getId() == ServerFrameId::Authentification) & (msg.getLen() == 0))
+                    {
+                        m_clients[client_idx].logout();
+                    }
+                    break;
+                }
+                case ClientState::TakingControl:
+                {
+                    if (msg.getId() == ServerFrameId::Authentification)
+                    {
+                        if (msg.getLen() == 0)
+                        {
+                            m_client_taking_control.removeData();
+                            m_clients[client_idx].logout();
+                        }
+                    }
+                    else
+                    {
+                        // Store Messages from client taking control
+                        rx_frames_buffer.push(msg);
+                    }
+                    break;
+                }
+                default:
+                {
+                    break;
+                }
+                }
             }
         }
     }
@@ -175,3 +273,5 @@ Option<uint8_t> Clients<NbAllowedClients, MaxFrameLen>::getClientTakingControl()
         return Option<uint8_t>();
     }
 }
+
+#endif // TCP_IP_CLIENT

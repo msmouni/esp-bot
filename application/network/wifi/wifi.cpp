@@ -189,7 +189,7 @@ ServerError Wifi::startTcpServer()
 {
     if (getState() == WifiState::Connected)
     {
-        m_tcp_ip_server.start(ServerSocketDesc(m_netiface.ip_config.ip, m_server_config.socket_port), m_server_config.login);
+        m_tcp_ip_server.start(ServerSocketDesc(m_netiface.ip_config.ip, m_server_config.m_socket_port), m_server_config.m_login);
 
         return ServerError::None;
     }

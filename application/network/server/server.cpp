@@ -14,7 +14,7 @@ void setSocketNonBlocking(int socket_desc)
 void TcpIpServer::start(ServerSocketDesc socket_desc, ServerLogin login)
 {
     m_socket_desc = socket_desc;
-    m_login = login;
+    m_clients.setServerLogin(login);
     m_state = ServerState::Uninitialized;
 }
 
@@ -156,7 +156,7 @@ void TcpIpServer::tryToSendMsg()
     data[2] = 3;
     data[3] = 4;
     data[4] = 5;
-    ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(1, 5, data);
+    ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Debug, 5, data);
 
     m_clients.sendMsg(status_frame);
 }

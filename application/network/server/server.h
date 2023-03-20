@@ -18,8 +18,6 @@ private:
     // Debug Tag
     constexpr static const char *SERVER_TAG = "SERVER";
 
-    ServerLogin m_login;
-
     static const int MAX_MSG_SIZE = 128; // To adjust later reg Msgs to send
 
     int m_socket; // Socket descriptor id

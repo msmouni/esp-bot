@@ -12,7 +12,7 @@ MainProgram::MainProgram()
 
     StaticIpSetting static_ip_setting = StaticIpSetting(wifi_ssid_password, ip_config);
 
-    ServerConfig tcp_ip_server_config = ServerConfig("test_admin", "test_password", 12345);
+    ServerConfig tcp_ip_server_config = ServerConfig(ServerLogin(Login("test_admin", "test_password"), Login("super_admin", "super_password")), 12345);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     m_wifi = new Wifi(static_ip_setting, tcp_ip_server_config);
