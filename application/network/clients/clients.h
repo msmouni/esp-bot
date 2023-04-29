@@ -123,6 +123,7 @@ Option<ServerFrame<MaxFrameLen>> Clients<NbAllowedClients, MaxFrameLen>::getRecv
 template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
 ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendMsg(ServerFrame<MaxFrameLen> frame)
 {
+    // TODO: Broadcast or send to one client
     if (tx_frames_buffer.push(frame))
     {
         return ClientsError::None;
@@ -152,6 +153,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                     .isErr())
             {
                 deleteClient(client_idx);
+                return; // TODO: continue for others
             }
         }
 
@@ -161,6 +163,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                 .isErr())
         {
             deleteClient(client_idx);
+            return; // TODO: continue for others
         }
         else
         {
