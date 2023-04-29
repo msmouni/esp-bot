@@ -1,5 +1,21 @@
 #include "server.h"
 
+CircularBuffer<ServerFrame<TcpIpServer::MAX_MSG_SIZE>, 50> TcpIpServer::m_pending_send_msg = {};
+
+void TcpIpServer::tryToSendMsg_25ms(void *args)
+{
+    // TMP
+    uint8_t data[MAX_MSG_SIZE - 5] = {0};
+    data[0] = 1;
+    data[1] = 2;
+    data[2] = 3;
+    data[3] = 4;
+    data[4] = 5;
+    ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Status, 5, data);
+
+    m_pending_send_msg.push(status_frame);
+}
+
 void setSocketNonBlocking(int socket_desc)
 {
     /* NON-BLOCKING FLAG:
@@ -11,11 +27,38 @@ void setSocketNonBlocking(int socket_desc)
     fcntl(socket_desc, F_SETFL, flags);
 }
 
+TcpIpServer::TcpIpServer()
+{
+    m_state = ServerState::NotStarted;
+}
+TcpIpServer::~TcpIpServer()
+{
+    close(m_socket);
+    delete m_timer_send_25ms;
+}
+
 void TcpIpServer::start(ServerSocketDesc socket_desc, ServerLogin login)
 {
     m_socket_desc = socket_desc;
     m_clients.setServerLogin(login);
+    m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg_25ms, NULL, 25000);
     m_state = ServerState::Uninitialized;
+}
+
+void TcpIpServer::stop()
+{
+    if ((m_state != ServerState::NotStarted) & (m_state != ServerState::Uninitialized))
+    {
+        // According to manual: Upon successful completion, 0 shall be returned; otherwise, -1 shall be returned and errno set to indicate the error.
+        close(m_socket);
+    }
+
+    if (m_state == ServerState::Running)
+    {
+        m_timer_send_25ms->stop();
+    }
+
+    m_state = ServerState::NotStarted;
 }
 
 ServerError TcpIpServer::update()
@@ -66,6 +109,17 @@ ServerError TcpIpServer::update()
             return ServerError::CannotListenOnSocket;
         }
 
+        esp_err_t res_strt = m_timer_send_25ms->start();
+        if (res_strt != ESP_OK)
+        {
+
+            m_error = ServerError::ErrorStarting25msTimer;
+            m_state = ServerState::Error;
+            return ServerError::ErrorStarting25msTimer;
+
+            ESP_LOGE(SERVER_TAG, "Error while starting server's 25ms timer: %d", res_strt);
+        }
+
         ESP_LOGI(SERVER_TAG, "TCP/IP Server Started");
 
         m_state = ServerState::Running;
@@ -77,7 +131,10 @@ ServerError TcpIpServer::update()
 
         tryToConnetClient();
 
-        // tryToSendMsg();
+        if (!m_pending_send_msg.isEmpty())
+        {
+            tryToSendMsg(m_pending_send_msg.get().getData());
+        }
 
         m_clients.update();
 
@@ -124,7 +181,7 @@ void TcpIpServer::tryToConnetClient()
     }
 }
 
-// TMP STORE MSGs IN BUFFER
+// TODO: STORE MSGs IN BUFFER
 void TcpIpServer::tryToRecvMsg()
 {
     // TMP
@@ -141,22 +198,11 @@ void TcpIpServer::tryToRecvMsg()
 
         msg.toBytes(m_recv_buffer);
 
-        tryToSendMsg();
-
         ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
     }
 }
 
-void TcpIpServer::tryToSendMsg()
+void TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
 {
-    // TMP
-    uint8_t data[MAX_MSG_SIZE - 5] = {0};
-    data[0] = 1;
-    data[1] = 2;
-    data[2] = 3;
-    data[3] = 4;
-    data[4] = 5;
-    ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Debug, 5, data);
-
-    m_clients.sendMsg(status_frame);
+    m_clients.sendMsg(frame);
 }
