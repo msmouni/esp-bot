@@ -6,9 +6,11 @@
 #include <stdint.h>
 #include <algorithm>
 
+// To Maybe adjust later : 32bits ...
 enum class ServerFrameId : uint32_t
 {
     Authentification = 0x01,
+    Status = 0x02,
     Debug = 0xFF,
 };
 

@@ -84,7 +84,7 @@ public:
         frame.toBytes(m_bytes_buffer);
 
         int r = send(m_socket, m_bytes_buffer, MaxFrameLen, 0);
-        bzero(m_bytes_buffer, r); // clear buffer
+        bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
 
         if (r == 0)
         {

@@ -5,5 +5,6 @@ enum class ServerError
     CannotCreateSocket,
     CannotBindSocket,
     CannotListenOnSocket,
-    ErrorConnectingToClient
+    ErrorConnectingToClient,
+    ErrorStarting25msTimer
 };
