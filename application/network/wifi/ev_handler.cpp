@@ -1,3 +1,4 @@
+#include "esp_mac.h"
 #include "ev_handler.h"
 
 EvHandler::EvHandler(WifiStateHandler *state_handler, const char *log_tag)
@@ -25,46 +26,25 @@ void EvHandler::handle(void *arg, esp_event_base_t event_base,
     }
 }
 
-esp_err_t EvHandler::setDnsServerInfos(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type)
-{
-    if (addr && (addr != IPADDR_NONE))
-    {
-        esp_netif_dns_info_t dns;
-        dns.ip.u_addr.ip4.addr = addr;
-        dns.ip.type = IPADDR_TYPE_V4;
-        ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, type, &dns));
-    }
-    return ESP_OK;
-}
-
-void EvHandler::setStaticIp(esp_netif_t *netif, IpConfig *ip_config)
-{
-    if (esp_netif_dhcpc_stop(netif) != ESP_OK)
-    {
-        ESP_LOGE(M_LOG_TAG, "Failed to stop dhcp client");
-        return;
-    }
-    esp_netif_ip_info_t ip = {};
-    memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-    ip.ip.addr = ipaddr_addr(ip_config->ip);
-    ip.netmask.addr = ipaddr_addr(ip_config->mask);
-    ip.gw.addr = ipaddr_addr(ip_config->gw);
-    if (esp_netif_set_ip_info(netif, &ip) != ESP_OK)
-    {
-        ESP_LOGE(M_LOG_TAG, "Failed to set ip info");
-        return;
-    }
-
-    // As DNS
-    // Router Address: GateWay
-    setDnsServerInfos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_MAIN);
-    setDnsServerInfos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_BACKUP);
-}
-
 // event handler for wifi events
 void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
                                  int32_t event_id, void *event_data)
 {
+    //     ESP_LOGI(M_LOG_TAG, "event_base:%s |event_id:%ld", event_base, event_id);
+
+    //     if (event_id == WIFI_EVENT_AP_STACONNECTED)
+    //     {
+    //         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+    //         ESP_LOGI(TAG, "station " MACSTR " join, AID=%d",
+    //                  MAC2STR(event->mac), event->aid);
+    //     }
+    //     else if (event_id == WIFI_EVENT_AP_STADISCONNECTED)
+    //     {
+    //         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+    //         ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d",
+    //                  MAC2STR(event->mac), event->aid);
+    //     }
+    // }
 
     if (WIFI_EVENT == event_base)
     {
@@ -86,13 +66,15 @@ void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
 
             NetworkIface *network_iface = static_cast<NetworkIface *>(arg);
 
-            switch (network_iface->ip_setting)
+            switch (network_iface->m_setting.m_sta_setting.m_ip_setting)
             {
             case IpSetting::StaticIp:
             {
                 m_state_handler->changeState(WifiState::SettingIp);
 
-                setStaticIp(network_iface->netif, &network_iface->ip_config);
+                network_iface->setStaIp();
+
+                // setStaticIp(network_iface->m_sta_netif, &network_iface->m_setting.m_sta_setting.m_ip_config);
 
                 break;
             }
@@ -126,6 +108,21 @@ void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
                 ESP_LOGE(M_LOG_TAG, "Unable to connect to AP after %i attemps", MAX_FAILURES);
                 m_state_handler->changeState(WifiState::Error);
             }
+            break;
+        }
+        case WIFI_EVENT_AP_STACONNECTED:
+        {
+            wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+            ESP_LOGI(M_LOG_TAG, "station " MACSTR " join, AID=%d",
+                     MAC2STR(event->mac), event->aid);
+            break;
+        }
+        case WIFI_EVENT_AP_STADISCONNECTED:
+        {
+            wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+            ESP_LOGI(M_LOG_TAG, "station " MACSTR " leave, AID=%d",
+                     MAC2STR(event->mac), event->aid);
+            break;
         }
 
         default:

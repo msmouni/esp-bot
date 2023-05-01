@@ -5,17 +5,22 @@ MainProgram::MainProgram()
     m_state = MainState::Uninitialized;
 
     // TODO: Move all config to a json file for example                     ////////////////////////////////
+    // LATER: Will be stored at NVS (Non-volatile Storage)
     SsidPassword wifi_ssid_password = SsidPassword("My-SSID", "My-Password");
 
     // Router Address: GateWay
     IpConfig ip_config = IpConfig("xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx");
-
     StaticIpSetting static_ip_setting = StaticIpSetting(wifi_ssid_password, ip_config);
+    StaSetting wifi_sta_setting = StaSetting(static_ip_setting);
+
+    ApSetting wifi_ap_setting = ApSetting(SsidPassword("AP-SSID", "AP-Password"), IpConfig("xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx", "xxx.xxx.xxx.xxx"));
+
+    WifiSetting wifi_setting = WifiSetting(wifi_ap_setting, wifi_sta_setting);
 
     ServerConfig tcp_ip_server_config = ServerConfig(ServerLogin(Login("test_admin", "test_password"), Login("super_admin", "super_password")), 12345);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    m_wifi = new Wifi(static_ip_setting, tcp_ip_server_config);
+    m_wifi = new Wifi(wifi_setting, tcp_ip_server_config);
 }
 
 MainProgram::~MainProgram()

@@ -13,7 +13,56 @@ WifiStateHandler Wifi::m_state_handler = WifiStateHandler();
 EvHandler Wifi::m_ev_handler = EvHandler(&Wifi::m_state_handler, Wifi::WIFI_TAG);
 // std::mutex *Wifi::m_state_mutex{};
 
-void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
+void Wifi::configure_sta(StaSetting &sta_setting)
+{
+
+    // Copy SSID to config
+    const size_t ssid_len_to_copy = std::min(strlen(sta_setting.m_ssid_password.ssid),
+                                             sizeof(m_config.sta_config.sta.ssid));
+    memcpy(m_config.sta_config.sta.ssid, sta_setting.m_ssid_password.ssid, ssid_len_to_copy);
+
+    // Copy password to config
+    const size_t password_len_to_copy = std::min(strlen(sta_setting.m_ssid_password.password),
+                                                 sizeof(m_config.sta_config.sta.password));
+    memcpy(m_config.sta_config.sta.password, sta_setting.m_ssid_password.password, password_len_to_copy);
+
+    m_config.sta_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    m_config.sta_config.sta.pmf_cfg.capable = true;
+    m_config.sta_config.sta.pmf_cfg.required = false;
+
+    ESP_LOGI(WIFI_TAG, "STA  CONFIG SSID: %s | PASS: %s", m_config.sta_config.sta.ssid, m_config.sta_config.sta.password);
+}
+
+void Wifi::configure_ap(ApSetting &ap_setting)
+{
+    // Copy SSID to config
+    const size_t ssid_len = std::min(strlen(ap_setting.m_ssid_password.ssid),
+                                     sizeof(m_config.ap_config.ap.ssid));
+    memcpy(m_config.ap_config.ap.ssid, ap_setting.m_ssid_password.ssid, ssid_len);
+
+    // Copy password to config
+    const size_t password_len = std::min(strlen(ap_setting.m_ssid_password.password),
+                                         sizeof(m_config.ap_config.ap.password));
+    memcpy(m_config.ap_config.ap.password, ap_setting.m_ssid_password.password, password_len);
+
+    m_config.ap_config.ap.ssid_len = ssid_len;
+    m_config.ap_config.ap.channel = 1; // range 1 13
+    if (password_len == 0)
+    {
+        m_config.ap_config.ap.authmode = WIFI_AUTH_OPEN;
+    }
+    else
+    {
+
+        m_config.ap_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+    }
+    m_config.ap_config.ap.max_connection = TcpIpServer::NB_ALLOWED_CLIENTS; // Maximal STA connections
+    m_config.ap_config.ap.pmf_cfg.required = false;
+
+    ESP_LOGI(WIFI_TAG, "AP  CONFIG SSID: %s | PASS: %s", m_config.ap_config.ap.ssid, m_config.ap_config.ap.password);
+}
+
+void Wifi::configure(WifiSetting &setting) //, IpConfig ip_config)
 {
 
     /*// Check if the MAC cstring currently begins with a
@@ -25,48 +74,16 @@ void Wifi::create(SsidPassword ssid_password) //, IpConfig ip_config)
             esp_restart();
     }*/
 
-    // TODO: AP
-    m_ssid_password = ssid_password;
-
-    // Copy SSID to config
-    const size_t ssid_len_to_copy = std::min(strlen(m_ssid_password.ssid),
-                                             sizeof(m_wifi_config.sta.ssid));
-    memcpy(m_wifi_config.sta.ssid, m_ssid_password.ssid, ssid_len_to_copy);
-
-    // Copy password to config
-    const size_t password_len_to_copy = std::min(strlen(m_ssid_password.password),
-                                                 sizeof(m_wifi_config.sta.password));
-    memcpy(m_wifi_config.sta.password, m_ssid_password.password, password_len_to_copy);
-
-    m_wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    m_wifi_config.sta.pmf_cfg.capable = true;
-    m_wifi_config.sta.pmf_cfg.required = false;
-
-    ESP_LOGI(WIFI_TAG, "CONST  CONFIG SSID: %s | PASS: %s", m_wifi_config.sta.ssid, m_wifi_config.sta.password);
+    configure_ap(setting.m_ap_setting);
+    configure_sta(setting.m_sta_setting);
 }
-
-// Wifi DHCP Constructor
-Wifi::Wifi(DhcpSetting dhcp_setting, ServerConfig server_config)
+Wifi::Wifi(WifiSetting setting, ServerConfig server_config)
 {
-
-    create(dhcp_setting.ssid_password);
+    configure(setting);
 
     m_server_config = server_config;
 
-    m_netiface.ip_setting = IpSetting::Dhcp;
-}
-
-// Wifi Static Ip Constructor
-Wifi::Wifi(StaticIpSetting static_ip_setting, ServerConfig server_config)
-{
-
-    create(static_ip_setting.ssid_password);
-
-    m_server_config = server_config;
-
-    m_netiface.ip_config = static_ip_setting.ip_config;
-
-    m_netiface.ip_setting = IpSetting::StaticIp;
+    m_netiface.m_setting = setting;
 }
 
 void Wifi::changeState(WifiState new_state)
@@ -90,16 +107,20 @@ esp_err_t Wifi::init()
         // initialize the esp network interface
         status = esp_netif_init();
 
+        // create wifi access point in the wifi driver
+        m_netiface.m_ap_netif = esp_netif_create_default_wifi_ap();
         // create wifi station in the wifi driver
-        m_netiface.netif = esp_netif_create_default_wifi_sta();
+        m_netiface.m_sta_netif = esp_netif_create_default_wifi_sta();
 
         if (ESP_OK == status)
         {
-            if (!m_netiface.netif)
+            if ((!m_netiface.m_ap_netif) || (!m_netiface.m_sta_netif))
+            {
                 status = ESP_FAIL;
+            }
         }
 
-        // setup wifi station with the default wifi configuration
+        // setup wifi STA_AP with the default wifi configuration
         if (ESP_OK == status)
         {
             status = esp_wifi_init(&m_wifi_init_config);
@@ -120,22 +141,35 @@ esp_err_t Wifi::init()
             status = esp_event_handler_instance_register(IP_EVENT,
                                                          ESP_EVENT_ANY_ID,
                                                          &handleEvent,
-                                                         m_netiface.netif,
+                                                         &m_netiface,
                                                          NULL);
+        }
+
+        // Set Wifi storage to RAM: The default value is WIFI_STORAGE_FLASH
+        if (ESP_OK == status)
+        {
+            status = esp_wifi_set_storage(WIFI_STORAGE_RAM);
         }
 
         // set the wifi controller to be a station
         if (ESP_OK == status)
         {
-            status = esp_wifi_set_mode(WIFI_MODE_STA); // TODO keep track of mode
+            status = esp_wifi_set_mode(WIFI_MODE_APSTA);
         }
 
-        // set the wifi config
+        // set the wifi AP config
+        if (ESP_OK == status)
+        {
+            ESP_LOGI(WIFI_TAG, "AP configuration");
+            status = esp_wifi_set_config(WIFI_IF_AP, &m_config.ap_config);
+            ESP_LOGI(WIFI_TAG, "AP configured: %d", status);
+        }
+
+        // set the wifi STA config
         if (ESP_OK == status)
         {
             ESP_LOGI(WIFI_TAG, "STA configuration");
-
-            status = esp_wifi_set_config(WIFI_IF_STA, &m_wifi_config); // TODO keep track of mode
+            status = esp_wifi_set_config(WIFI_IF_STA, &m_config.sta_config);
             ESP_LOGI(WIFI_TAG, "STA configured: %d", status);
         }
 
@@ -189,7 +223,7 @@ ServerError Wifi::startTcpServer()
 {
     if (getState() == WifiState::Connected)
     {
-        m_tcp_ip_server.start(ServerSocketDesc(m_netiface.ip_config.ip, m_server_config.m_socket_port), m_server_config.m_login);
+        m_tcp_ip_server.start(ServerSocketDesc(m_netiface.m_setting.m_sta_setting.m_ip_config.ip, m_server_config.m_socket_port), m_server_config.m_login);
 
         return ServerError::None;
     }

@@ -15,6 +15,8 @@
 
 class TcpIpServer
 {
+public:
+    static const int NB_ALLOWED_CLIENTS = 5; // number of allowed clients
 private:
     // Debug Tag
     constexpr static const char *SERVER_TAG = "SERVER";
@@ -26,7 +28,6 @@ private:
     ServerSocketDesc m_socket_desc;
     socklen_t m_socket_addr_len = sizeof(sockaddr_in);
 
-    static const int NB_ALLOWED_CLIENTS = 5; // number of allowed clients
     Clients<NB_ALLOWED_CLIENTS, MAX_MSG_SIZE> m_clients = {};
 
     ServerState m_state = ServerState::Uninitialized;
