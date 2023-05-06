@@ -110,6 +110,16 @@ void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
             }
             break;
         }
+        case WIFI_EVENT_AP_START:
+        {
+            ESP_LOGI(M_LOG_TAG, "Wifi AP started");
+
+            NetworkIface *network_iface = static_cast<NetworkIface *>(arg);
+
+            network_iface->setAPIp();
+
+            break;
+        }
         case WIFI_EVENT_AP_STACONNECTED:
         {
             wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;

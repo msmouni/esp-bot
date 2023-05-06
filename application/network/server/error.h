@@ -2,9 +2,10 @@ enum class ServerError
 {
     None,
     NotReady,
-    CannotCreateSocket,
-    CannotBindSocket,
-    CannotListenOnSocket,
-    ErrorConnectingToClient,
+    // CannotCreateSocket,
+    // CannotBindSocket,
+    // CannotListenOnSocket,
+    // ErrorConnectingToClient,
+    SocketError,
     ErrorStarting25msTimer
 };

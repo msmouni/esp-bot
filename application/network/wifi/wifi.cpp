@@ -109,6 +109,8 @@ esp_err_t Wifi::init()
 
         // create wifi access point in the wifi driver
         m_netiface.m_ap_netif = esp_netif_create_default_wifi_ap();
+        // m_netiface.setAPIp(); // To test: either before starting iface or after
+
         // create wifi station in the wifi driver
         m_netiface.m_sta_netif = esp_netif_create_default_wifi_sta();
 

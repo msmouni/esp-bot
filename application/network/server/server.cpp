@@ -16,30 +16,21 @@ void TcpIpServer::tryToSendMsg_25ms(void *args)
     m_pending_send_msg.push(status_frame);
 }
 
-void setSocketNonBlocking(int socket_desc)
-{
-    /* NON-BLOCKING FLAG:
-        1- Call the fcntl() API to retrieve the socket descriptor's current flag settings into a local variable.
-        2- In our local variable, set the O_NONBLOCK (non-blocking) flag on. (being careful, of course, not to tamper with the other flags)
-        3- Call the fcntl() API to set the flags for the descriptor to the value in our local variable.
-    */
-    int flags = fcntl(socket_desc, F_GETFL) | O_NONBLOCK;
-    fcntl(socket_desc, F_SETFL, flags);
-}
-
 TcpIpServer::TcpIpServer()
 {
     m_state = ServerState::NotStarted;
 }
 TcpIpServer::~TcpIpServer()
 {
-    close(m_socket);
+    // close(m_socket);
+    m_socket_handler.stop();
     delete m_timer_send_25ms;
 }
 
 void TcpIpServer::start(ServerSocketDesc socket_desc, ServerLogin login)
 {
-    m_socket_desc = socket_desc;
+    // m_socket_desc = socket_desc;
+    m_socket_handler.start(socket_desc);
     m_clients.setServerLogin(login);
     m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg_25ms, NULL, 25000);
     m_state = ServerState::Uninitialized;
@@ -49,8 +40,10 @@ void TcpIpServer::stop()
 {
     if ((m_state != ServerState::NotStarted) & (m_state != ServerState::Uninitialized))
     {
-        // According to manual: Upon successful completion, 0 shall be returned; otherwise, -1 shall be returned and errno set to indicate the error.
-        close(m_socket);
+        // // According to manual: Upon successful completion, 0 shall be returned; otherwise, -1 shall be returned and errno set to indicate the error.
+        // close(m_socket);
+
+        m_socket_handler.stop();
     }
 
     if (m_state == ServerState::Running)
@@ -67,7 +60,19 @@ ServerError TcpIpServer::update()
     {
     case ServerState::Uninitialized:
     {
-        m_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (m_socket_handler.update() != SocketError::None)
+        {
+            m_error = ServerError::SocketError;
+            m_state = ServerState::Error;
+            return ServerError::SocketError;
+        }
+        else if (m_socket_handler.getState() == SocketState::Listening)
+        {
+            m_state = ServerState::SocketsListening;
+        }
+
+        break;
+        /*m_socket = socket(AF_INET, SOCK_STREAM, 0);
 
         if (m_socket < 0)
         {
@@ -83,9 +88,28 @@ ServerError TcpIpServer::update()
 
         m_state = ServerState::SocketCreated;
 
+        break;*/
+    }
+    case ServerState::SocketsListening:
+    {
+        esp_err_t res_strt = m_timer_send_25ms->start();
+        if (res_strt != ESP_OK)
+        {
+
+            m_error = ServerError::ErrorStarting25msTimer;
+            m_state = ServerState::Error;
+            return ServerError::ErrorStarting25msTimer;
+
+            ESP_LOGE(SERVER_TAG, "Error while starting server's 25ms timer: %d", res_strt);
+        }
+
+        ESP_LOGI(SERVER_TAG, "TCP/IP Server Started");
+
+        m_state = ServerState::Running;
+
         break;
     }
-    case ServerState::SocketCreated:
+    /*case ServerState::SocketCreated:
     {
         if (bind(m_socket, (struct sockaddr *)&m_socket_desc.addr, m_socket_addr_len) < 0)
         {
@@ -125,7 +149,7 @@ ServerError TcpIpServer::update()
         m_state = ServerState::Running;
 
         break;
-    }
+    }*/
     case ServerState::Running:
     {
 
@@ -162,22 +186,32 @@ void TcpIpServer::tryToConnetClient()
 
         sockaddr_in *next_client_addr = opt_next_client_addr.getData();
 
-        /*
-        On success, these system calls return a file descriptor for the
-        accepted socket (a nonnegative integer).  On error, -1 is
-        returned, errno is set to indicate the error, and addrlen is left
-        unchanged.
-        */
-        int client_socket = accept(m_socket, (sockaddr *)next_client_addr, &m_socket_addr_len);
+        Option<int> res_connect_client = m_socket_handler.tryToConnetClient(next_client_addr);
 
-        if (client_socket >= 0)
+        if (res_connect_client
+                .isSome())
         {
-            setSocketNonBlocking(client_socket);
-
-            m_clients.addClient(client_socket);
+            m_clients.addClient(res_connect_client.getData());
 
             ESP_LOGI(SERVER_TAG, "Client connected: IP: %s | Port: %d\n", inet_ntoa(next_client_addr->sin_addr), (int)ntohs(next_client_addr->sin_port));
         }
+
+        // /*
+        // On success, these system calls return a file descriptor for the
+        // accepted socket (a nonnegative integer).  On error, -1 is
+        // returned, errno is set to indicate the error, and addrlen is left
+        // unchanged.
+        // */
+        // int client_socket = accept(m_socket, (sockaddr *)next_client_addr, &m_socket_addr_len);
+
+        // if (client_socket >= 0)
+        // {
+        //     setSocketNonBlocking(client_socket);
+
+        //     m_clients.addClient(client_socket);
+
+        //     ESP_LOGI(SERVER_TAG, "Client connected: IP: %s | Port: %d\n", inet_ntoa(next_client_addr->sin_addr), (int)ntohs(next_client_addr->sin_port));
+        // }
     }
 }
 
