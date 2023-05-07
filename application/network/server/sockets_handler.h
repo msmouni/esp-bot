@@ -8,21 +8,16 @@
 #include "lwip/dns.h"
 #include <algorithm>
 #include "esp_log.h"
+#include "additional.h"
 #include "socket_desc.h"
 
+using namespace additional::option;
+
 void setSocketNonBlocking(int socket_desc);
-// {
-//     /* NON-BLOCKING FLAG:
-//         1- Call the fcntl() API to retrieve the socket descriptor's current flag settings into a local variable.
-//         2- In our local variable, set the O_NONBLOCK (non-blocking) flag on. (being careful, of course, not to tamper with the other flags)
-//         3- Call the fcntl() API to set the flags for the descriptor to the value in our local variable.
-//     */
-//     int flags = fcntl(socket_desc, F_GETFL) | O_NONBLOCK;
-//     fcntl(socket_desc, F_SETFL, flags);
-// }
 
 enum class WhichSocket : uint8_t
 {
+    Undefined,
     Ap,
     Sta,
 };
@@ -52,8 +47,7 @@ class Socket
 
     int m_socket; // Socket descriptor id
 
-    // WhichSocket m_type;
-    uint8_t m_type;
+    WhichSocket m_type;
 
     SocketState m_state;
     SocketError m_error;
@@ -76,11 +70,73 @@ public:
     Option<int> tryToConnetClient(sockaddr_in *);
 };
 
-template <uint8_t NbAllowedClients>
+// struct ApStaSocketsError
+// {
+//     SocketError m_ap;
+//     SocketError m_sta;
+
+//     ApStaSocketsError() : m_ap(SocketError::None), m_sta(SocketError::None){};
+
+//     bool hasApError()
+//     {
+//         return (m_ap != SocketError::None);
+//     }
+//     bool hasStaError()
+//     {
+//         return (m_sta != SocketError::None);
+//     }
+//     bool hasApStaError()
+//     {
+//         return hasApError() || hasStaError();
+//     }
+// };
+
+enum class ApStaSocketsState
+{
+    NotStarted,
+    InitializingAp,
+    InitializingSta,
+    InitializingApSta,
+    ListeningOnSta,
+    ListeningOnAp,
+    ListeningOnApSta,
+    ErrorOnAp,
+    ErrorOnSta,
+    ErrorOnApSta,
+};
+
+enum class SocketsHandlerError
+{
+    None,
+    ErrorOnSta,
+    ErrorOnAp,
+    ErrorOnApSta
+};
+
 class SocketsHandler
 {
-    Socket m_ap_socket;
-    Socket m_sta_socket;
+    const char *M_LOG_TAG = "SocketsHandler";
+
+    Socket *m_ap_socket;
+    Socket *m_sta_socket;
+
+    ApStaSocketsState m_state;
+    SocketsHandlerError m_error;
+
+    uint8_t m_nb_allowed_clients;
+
+public:
+    /// SocketsHandler(NbAllowedClients)
+    SocketsHandler(uint8_t);
+    ~SocketsHandler();
+
+    void start(ApStaSocketsDesc);
+    void stop();
+
+    SocketsHandlerError update();
+    ApStaSocketsState getState();
+    bool isListening();
+    Option<int> tryToConnetClient(sockaddr_in *);
 };
 
 #endif // SOCKETS_HANDLER_H
