@@ -180,6 +180,8 @@ esp_err_t Wifi::init()
         {
             ESP_LOGI(WIFI_TAG, "Starting STA ...");
             status = esp_wifi_start();
+            // esp_wifi_stop
+            // esp_wifi_deinit
         }
 
         if ((ESP_OK == status) && (WifiState::NotInitialized == getState()))
@@ -301,7 +303,26 @@ WifiResult Wifi::update()
     }
     case WifiState::Error:
     {
-        return WifiResult::Err;
+        // return WifiResult::Err;
+
+        changeState(WifiState::NotInitialized);
+        esp_wifi_stop();
+        ESP_LOGI(WIFI_TAG, "STA configuration");
+
+        // Copy password to config
+        const size_t password_len_to_copy = std::min(strlen("QdQ3kPrVaRe6udkax9"),
+                                                     sizeof(m_config.sta_config.sta.password));
+        memcpy(m_config.sta_config.sta.password, "QdQ3kPrVaRe6udkax9", password_len_to_copy);
+
+        esp_err_t status = esp_wifi_set_config(WIFI_IF_STA, &m_config.sta_config);
+        ESP_LOGI(WIFI_TAG, "STA  CONFIG SSID: %s | PASS: %s", m_config.sta_config.sta.ssid, m_config.sta_config.sta.password);
+        ESP_LOGI(WIFI_TAG, "STA configured: %d", status);
+        esp_wifi_start(); // Start WiFi according to current configuration
+        if ((ESP_OK == status) && (WifiState::NotInitialized == getState()))
+        {
+            // In case Event happens before
+            changeState(WifiState::Initialized);
+        }
     }
     default:
         break;

@@ -55,8 +55,13 @@ void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
         case WIFI_EVENT_STA_START:
         {
             ESP_LOGI(M_LOG_TAG, "Wifi STA started");
-            m_state_handler->changeState(WifiState::ReadyToConnect);
 
+            WifiState current_state = m_state_handler->getState();
+
+            if ((current_state == WifiState::NotInitialized) || (current_state == WifiState::Initialized))
+            {
+                m_state_handler->changeState(WifiState::ReadyToConnect);
+            }
             break;
         }
 
