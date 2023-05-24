@@ -174,6 +174,8 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
 
                 ServerFrame<MaxFrameLen> msg = opt_msg.getData();
 
+                msg.debug(); // TMP
+
                 switch (client_state)
                 {
                 case ClientState::Connected:
@@ -187,6 +189,8 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                             // -> [0, 0, 0, 1, 29, 123, 115, 117, 112, 101, 114, 95, 97, 100, 109, 105, 110, 58, 115, 117, 112, 101, 114, 95, 112, 97, 115, 115, 119, 111, 114, 100, 125, 0]
 
                             ServerLogin &server_login = m_server_login.getData();
+
+                            // TODO: Send ACK to confirm auth to client
 
                             // TO VERIFY: reinterpret_cast
                             char *msg_data = reinterpret_cast<char *>(msg.getData());

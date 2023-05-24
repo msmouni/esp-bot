@@ -12,6 +12,8 @@
 #include "server.h"
 #include "result.h"
 
+///////////////  TODO: Adjust states + Correct Status Frame + Handle Errors
+
 class Wifi
 {
 private:
