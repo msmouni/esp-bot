@@ -1,4 +1,4 @@
-#include "sockets_handler.h"
+#include "handler.h"
 
 void setSocketNonBlocking(int socket_desc)
 {
@@ -150,6 +150,9 @@ SocketsHandler::~SocketsHandler()
 {
     m_ap_socket->stop();
     m_sta_socket->stop();
+
+    delete m_ap_socket;
+    delete m_sta_socket;
 }
 
 void SocketsHandler::start(ApStaSocketsDesc sockets_desc)
