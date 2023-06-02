@@ -1,6 +1,7 @@
 #include "server.h"
 
 CircularBuffer<StatusFrameData, 10> TcpIpServer::m_pending_status_data = {};
+// CamPicture TcpIpServer::m_cam_pic = {};
 
 void TcpIpServer::tryToSendMsg_25ms(void *args)
 {
@@ -13,13 +14,14 @@ void TcpIpServer::tryToSendMsg_25ms(void *args)
     // data[4] = 5;
     // ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Status, 5, data);
 
-    StatusFrameData status_data = StatusFrameData();
+    // StatusFrameData status_data = StatusFrameData(m_cam_pic);
 
-    m_pending_status_data.push(status_data);
+    // m_pending_status_data.push(status_data);
 }
 
 TcpIpServer::TcpIpServer()
 {
+    // init_camera();
     m_state = ServerState::NotStarted;
 }
 TcpIpServer::~TcpIpServer()
@@ -53,6 +55,10 @@ void TcpIpServer::stop()
 
 ServerError TcpIpServer::update()
 {
+    // TMP
+    // m_cam_pic =
+    // take_pic();
+
     switch (m_state)
     {
     case ServerState::Uninitialized:

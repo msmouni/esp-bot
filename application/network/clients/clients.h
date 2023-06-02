@@ -8,7 +8,7 @@
 
 /// Only one client have state `TakingControl` and can send messages to server
 /// The other clients can only receive messages from server
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 class Clients
 {
 private:
@@ -57,7 +57,7 @@ public:
 
 // https://isocpp.org/wiki/faq/templates#templates-defn-vs-decl
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 Option<struct sockaddr_in *> Clients<NbAllowedClients, MaxFrameLen>::getClientAddr(uint8_t client_index)
 {
     if (client_index < NbAllowedClients)
@@ -70,19 +70,19 @@ Option<struct sockaddr_in *> Clients<NbAllowedClients, MaxFrameLen>::getClientAd
     }
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::setServerLogin(ServerLogin login)
 {
     m_server_login.setData(login);
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 Option<struct sockaddr_in *> Clients<NbAllowedClients, MaxFrameLen>::getNextClientAddr(void)
 {
     return getClientAddr(m_nb_connected_clients);
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::addClient(int socket_desc)
 {
     m_clients[m_nb_connected_clients].connect(m_client_id_tracker, socket_desc);
@@ -91,7 +91,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::addClient(int socket_desc)
     m_client_id_tracker += 1;
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::deleteClient(uint8_t client_index)
 {
     if (client_index < m_nb_connected_clients)
@@ -116,13 +116,13 @@ void Clients<NbAllowedClients, MaxFrameLen>::deleteClient(uint8_t client_index)
     }
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 Option<ServerFrame<MaxFrameLen>> Clients<NbAllowedClients, MaxFrameLen>::getRecvMsg()
 {
     return rx_frames_buffer.get();
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendMsg(ServerFrame<MaxFrameLen> frame)
 {
     // TODO: Broadcast or send to one client
@@ -136,7 +136,7 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendMsg(ServerFrame<MaxFram
     }
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendStatus(StatusFrameData status_data)
 {
     if (m_status_data_to_send.push(status_data))
@@ -149,7 +149,7 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendStatus(StatusFrameData 
     }
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::update()
 {
 
@@ -173,9 +173,9 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                 status_frame.m_auth_type = AuthentificationType::AsSuperClient;
             }
 
-            char bytes[MaxFrameLen - 5];
+            char bytes[MaxFrameLen - 6];
 
-            uint8_t frame_len = status_frame.toBytes(bytes);
+            uint16_t frame_len = status_frame.toBytes(bytes);
 
             ServerFrame<MaxFrameLen> frame = ServerFrame<MaxFrameLen>(ServerFrameId::Status, frame_len, bytes);
 
@@ -327,7 +327,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
     }
 }
 
-template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 Option<uint8_t> Clients<NbAllowedClients, MaxFrameLen>::getClientTakingControl()
 {
     if (m_client_taking_control

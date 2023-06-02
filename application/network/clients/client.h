@@ -11,7 +11,7 @@
 using namespace additional::result;
 using namespace additional::option;
 
-template <uint8_t MaxFrameLen>
+template <uint16_t MaxFrameLen>
 class Client
 {
 private:

@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <algorithm>
+#include "cam.h"
 
 // To Maybe adjust later : 32bits ...
 enum class ServerFrameId : uint32_t
@@ -14,20 +15,20 @@ enum class ServerFrameId : uint32_t
     Debug = 0xFF,
 };
 
-// ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t DATA[DATA_LEN]]
-template <uint8_t MaxFrameLen>
+// ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH[2], uint8_t DATA[DATA_LEN]]
+template <uint16_t MaxFrameLen>
 class ServerFrame
 {
 private:
     ServerFrameId m_id;
-    uint8_t m_len;
-    uint8_t m_data[MaxFrameLen - 5] = {0};
+    uint16_t m_len;
+    uint8_t m_data[MaxFrameLen - 6] = {0};
 
 public:
     ServerFrame(){};
-    ServerFrame(ServerFrameId id, uint8_t len, char (&data)[MaxFrameLen - 5]) : m_id(id), m_len(len)
+    ServerFrame(ServerFrameId id, uint16_t len, char (&data)[MaxFrameLen - 6]) : m_id(id), m_len(len)
     {
-        for (uint8_t i = 0; i < MaxFrameLen - 5; i++)
+        for (uint8_t i = 0; i < MaxFrameLen - 6; i++)
         {
             m_data[i] = data[i];
         }
@@ -43,11 +44,12 @@ public:
         // Endianness ...
         m_id = static_cast<ServerFrameId>((uint32_t(bytes_frame[0]) << 24) | (uint32_t(bytes_frame[1]) << 16) | (uint32_t(bytes_frame[2]) << 8) | (uint32_t(bytes_frame[3])));
 
-        m_len = std::min(bytes_frame[4], MaxFrameLen);
+        uint16_t frame_len = ((uint16_t)(bytes_frame[4] << 8) | (uint16_t)(bytes_frame[5]));
+        m_len = std::min(frame_len, MaxFrameLen);
 
         for (uint8_t i = 0; i < m_len; i++)
         {
-            m_data[i] = bytes_frame[i + 5];
+            m_data[i] = bytes_frame[i + 6];
         }
     }
 
@@ -65,11 +67,12 @@ public:
         buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
         buffer[3] = static_cast<uint8_t>(id_uint32);
 
-        buffer[4] = m_len;
+        buffer[4] = static_cast<uint8_t>(m_len >> 8);
+        buffer[5] = static_cast<uint8_t>(m_len);
 
-        for (uint8_t i = 5; i < MaxFrameLen; i++)
+        for (uint8_t i = 6; i < MaxFrameLen; i++)
         {
-            buffer[i] = m_data[i - 5];
+            buffer[i] = m_data[i - 6];
         }
     }
 
@@ -77,7 +80,7 @@ public:
     {
         printf("ID: %ld\nLEN: %d\nData: [", static_cast<uint32_t>(m_id), m_len);
 
-        for (uint8_t i = 0; i < m_len; i++)
+        for (uint16_t i = 0; i < m_len; i++)
         {
             if (i == m_len - 1)
             {
@@ -97,12 +100,12 @@ public:
         return m_id;
     }
 
-    uint8_t getLen()
+    uint16_t getLen()
     {
         return m_len;
     }
 
-    uint8_t (&getData())[MaxFrameLen - 5]
+    uint8_t (&getData())[MaxFrameLen - 6]
     {
         return m_data;
     }
@@ -145,7 +148,7 @@ struct AuthFrameData
         memcpy(m_login_password, login_password, login_pass_len);
     }
 
-    uint8_t toBytes(char *bytes)
+    uint16_t toBytes(char *bytes)
     {
 
         *bytes = (uint8_t)m_auth_req;
@@ -154,7 +157,7 @@ struct AuthFrameData
 
         memcpy(bytes, m_login_password, MAX_LOGIN_PASS_LEN);
 
-        return MAX_LOGIN_PASS_LEN + 1;
+        return (uint16_t)(MAX_LOGIN_PASS_LEN + 1);
     }
 };
 
@@ -171,29 +174,35 @@ enum class AuthentificationType : uint8_t
 struct StatusFrameData
 {
     AuthentificationType m_auth_type;
+    CamPicture m_cam_pic;
 
-    StatusFrameData()
+    StatusFrameData(AuthentificationType auth_type = AuthentificationType::Undefined, CamPicture cam_pic = {})
     {
-        m_auth_type = AuthentificationType::Undefined;
+        m_auth_type = auth_type;
+        m_cam_pic = cam_pic;
     }
-
     StatusFrameData(char *bytes)
     {
         m_auth_type = static_cast<AuthentificationType>(*bytes);
 
-        // bytes++;
+        bytes++;
+
+        m_cam_pic = CamPicture(bytes);
     }
 
-    StatusFrameData(AuthentificationType auth_type)
+    uint16_t toBytes(char *bytes)
     {
-        m_auth_type = auth_type;
-    }
+        uint16_t bytes_size = 0;
 
-    uint8_t toBytes(char *bytes)
-    {
         *bytes = (uint8_t)m_auth_type;
 
-        return 1;
+        bytes_size += 1;
+
+        bytes++;
+
+        bytes_size += m_cam_pic.toBytes(bytes);
+
+        return bytes_size;
     }
 };
 

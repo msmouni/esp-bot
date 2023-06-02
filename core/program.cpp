@@ -41,6 +41,8 @@ esp_err_t MainProgram::setup()
         status = initNvs();
     }
 
+    init_camera();
+
     return status;
 };
 
