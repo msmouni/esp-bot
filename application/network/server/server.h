@@ -15,6 +15,7 @@
 #include "clients.h"
 #include "timer.h"
 #include "handler.h"
+#include "cam.h"
 
 class TcpIpServer
 {
@@ -24,9 +25,10 @@ private:
     // Debug Tag
     constexpr static const char *SERVER_TAG = "SERVER";
 
-    static const int MAX_MSG_SIZE = 128; // To adjust later reg Msgs to send
+    static const uint16_t MAX_MSG_SIZE = 128; // 1024; // 8192; // 128; // To adjust later reg Msgs to send
     // static CircularBuffer<ServerFrame<MAX_MSG_SIZE>, 50> m_pending_send_msg;
     static CircularBuffer<StatusFrameData, 10> m_pending_status_data;
+    static CamPicture m_cam_pic;
 
     SocketsHandler m_socket_handler = SocketsHandler(NB_ALLOWED_CLIENTS);
 

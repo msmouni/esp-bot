@@ -1,6 +1,7 @@
 #include "server.h"
 
 CircularBuffer<StatusFrameData, 10> TcpIpServer::m_pending_status_data = {};
+CamPicture TcpIpServer::m_cam_pic = {};
 
 void TcpIpServer::tryToSendMsg_25ms(void *args)
 {
@@ -44,6 +45,11 @@ void TcpIpServer::stop()
 
 ServerError TcpIpServer::update()
 {
+    // TMP
+    // m_cam_pic =
+    // take_pic();
+    m_cam_pic.take_pic();
+
     switch (m_state)
     {
     case ServerState::Uninitialized:
@@ -131,6 +137,7 @@ void TcpIpServer::tryToConnetClient()
 // TODO: STORE MSGs IN BUFFER
 void TcpIpServer::tryToRecvMsg()
 {
+    // CONTROL messages ...
     // TMP
     Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvMsg();
 
