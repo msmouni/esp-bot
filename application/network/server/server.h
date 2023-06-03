@@ -15,20 +15,20 @@
 #include "clients.h"
 #include "timer.h"
 #include "handler.h"
-#include "cam.h"
+// #include "cam.h"
 
 class TcpIpServer
 {
 public:
-    static const int NB_ALLOWED_CLIENTS = 5; // number of allowed clients
+    static const int NB_ALLOWED_CLIENTS = 5;  // number of allowed clients
+    static const uint16_t MAX_MSG_SIZE = 128; // 1024; // 8192; // 128; // To adjust later reg Msgs to send
 private:
     // Debug Tag
     constexpr static const char *SERVER_TAG = "SERVER";
 
-    static const uint16_t MAX_MSG_SIZE = 128; // 1024; // 8192; // 128; // To adjust later reg Msgs to send
     // static CircularBuffer<ServerFrame<MAX_MSG_SIZE>, 50> m_pending_send_msg;
     static CircularBuffer<StatusFrameData, 10> m_pending_status_data;
-    static CamPicture m_cam_pic;
+    // static CamPicture m_cam_pic; // TODO: Maybe move elsewhere
 
     SocketsHandler m_socket_handler = SocketsHandler(NB_ALLOWED_CLIENTS);
 
@@ -46,15 +46,15 @@ private:
     // Message receive of a given size
     void tryToRecvMsg();
 
-    void tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
     void tryToSendStatus(StatusFrameData);
 
-    static void tryToSendMsg_25ms(void *);
+    static void tryToSendMsg25ms(void *);
 
 public:
     TcpIpServer();
     ~TcpIpServer();
     void start(ApStaSocketsDesc, ServerLogin);
+    void tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
     void stop();
 
     ServerError update();

@@ -1,9 +1,9 @@
 #include "server.h"
 
 CircularBuffer<StatusFrameData, 10> TcpIpServer::m_pending_status_data = {};
-CamPicture TcpIpServer::m_cam_pic = {};
+// CamPicture TcpIpServer::m_cam_pic = {};
 
-void TcpIpServer::tryToSendMsg_25ms(void *args)
+void TcpIpServer::tryToSendMsg25ms(void *args)
 {
     StatusFrameData status_data = StatusFrameData();
 
@@ -24,7 +24,7 @@ void TcpIpServer::start(ApStaSocketsDesc sockets_desc, ServerLogin login)
 {
     m_socket_handler.start(sockets_desc);
     m_clients.setServerLogin(login);
-    m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg_25ms, NULL, 25000);
+    m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg25ms, NULL, 25000);
     m_state = ServerState::Uninitialized;
 }
 
@@ -48,7 +48,7 @@ ServerError TcpIpServer::update()
     // TMP
     // m_cam_pic =
     // take_pic();
-    m_cam_pic.take_pic();
+    // m_cam_pic.take_pic();
 
     switch (m_state)
     {

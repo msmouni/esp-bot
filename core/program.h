@@ -1,5 +1,6 @@
 #include "nvs_flash.h"
 #include "wifi.h"
+#include "cam.h"
 #include "state.h"
 
 // final specifies that this class may not appear in the base-specifier-list of another class definition (in other words, cannot be derived from).
@@ -18,6 +19,9 @@ private:
     void update(void);
 
     Wifi *m_wifi = NULL;
+#if ESP_CAMERA_SUPPORTED
+    Camera m_camera = Camera();
+#endif
 
 public:
     MainProgram(void);

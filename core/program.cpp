@@ -40,8 +40,13 @@ esp_err_t MainProgram::setup()
         ESP_LOGI(LOG_TAG, "Initializing NVS");
         status = initNvs();
     }
-
-    init_camera();
+#if ESP_CAMERA_SUPPORTED
+    if (ESP_OK == status)
+    {
+        ESP_LOGI(LOG_TAG, "Initializing Camera");
+        status = m_camera.init();
+    }
+#endif
 
     return status;
 };
@@ -106,6 +111,26 @@ void MainProgram::update()
 {
     if (m_state == MainState::Running)
     {
+#if ESP_CAMERA_SUPPORTED
+        if (m_camera
+                .isPicAvailable())
+        {
+            bool done_sending = false;
+
+            while (!done_sending)
+            {
+                Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> opt_pic_frame = m_camera.getNextFrame();
+                if (opt_pic_frame.isSome())
+                {
+                    m_wifi->tryToSendMsg(opt_pic_frame.getData());
+                }
+                else
+                {
+                    done_sending = true;
+                }
+            }
+        }
+#endif
         if (m_wifi->update() == WifiResult::Err)
         {
             m_state = MainState::Error;

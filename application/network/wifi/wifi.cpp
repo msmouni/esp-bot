@@ -318,3 +318,8 @@ void Wifi::log(const char *debug_msg)
 {
     ESP_LOGI(WIFI_TAG, "%s", debug_msg);
 }
+
+void Wifi::tryToSendMsg(ServerFrame<TcpIpServer::MAX_MSG_SIZE> frame)
+{
+    m_tcp_ip_server.tryToSendMsg(frame);
+}

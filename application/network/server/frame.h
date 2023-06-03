@@ -11,6 +11,7 @@ enum class ServerFrameId : uint32_t
 {
     Authentification = 0x01,
     Status = 0x02,
+    CamPic = 0x03,
     Debug = 0xFF,
 };
 
