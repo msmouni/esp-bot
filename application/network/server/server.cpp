@@ -156,9 +156,9 @@ void TcpIpServer::tryToRecvMsg()
     }
 }
 
-void TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
+bool TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
 {
-    m_clients.sendMsg(frame);
+    return (m_clients.sendMsg(frame) == ClientsError::None);
 }
 
 void TcpIpServer::tryToSendStatus(StatusFrameData status_data)

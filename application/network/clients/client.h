@@ -88,6 +88,7 @@ public:
 
         if (r == 0)
         {
+            printf("Client_%d NoResponse\n", m_id);
             return Result<int, ClientError>(ClientError::NoResponse);
         }
         else if (r > 0)

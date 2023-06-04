@@ -64,7 +64,7 @@ esp_err_t Camera::init()
         return err;
     }
 
-    m_timer_send_100ms = new PeriodicTimer("Camera_Take_Pic_100ms", takePic100ms, NULL, 100000);
+    m_timer_send_100ms = new PeriodicTimer("Camera_Take_Pic_100ms", takePic100ms, NULL, 10000);
     err = m_timer_send_100ms->start();
 
     if (err != ESP_OK)

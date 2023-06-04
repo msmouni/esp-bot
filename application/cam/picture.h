@@ -126,8 +126,6 @@ struct CamPicture
 
             memcpy(m_frame_buff, m_pic_buff + (m_nb_processed_frames * MAX_FRAME_DATA_LEN), len_to_copy);
 
-            Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> res = Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>>(ServerFrame<TcpIpServer::MAX_MSG_SIZE>(ServerFrameId::CamPic, (uint16_t)len_to_copy, (uint8_t)m_nb_processed_frames, m_frame_buff));
-
             m_nb_processed_frames += 1;
 
             if (m_nb_processed_frames == m_nb_frames_to_send)
@@ -139,6 +137,12 @@ struct CamPicture
             {
                 // printf("PictureState::Processing\n");
             }
+
+            ServerFrame<TcpIpServer::MAX_MSG_SIZE> frame = ServerFrame<TcpIpServer::MAX_MSG_SIZE>(ServerFrameId::CamPic, (uint16_t)len_to_copy, (uint8_t)(m_nb_frames_to_send - m_nb_processed_frames), m_frame_buff);
+            // frame.debug();
+
+            Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> res = Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>>(frame);
+
             return res;
         }
         else

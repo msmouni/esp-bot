@@ -54,7 +54,7 @@ public:
     TcpIpServer();
     ~TcpIpServer();
     void start(ApStaSocketsDesc, ServerLogin);
-    void tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
+    bool tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
     void stop();
 
     ServerError update();

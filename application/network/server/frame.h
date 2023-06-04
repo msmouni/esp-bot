@@ -91,19 +91,19 @@ public:
 
     void debug()
     {
-        printf("ID: %ld\nLEN: %d\nData: [", static_cast<uint32_t>(m_id), m_len);
+        printf("ID: %ld\nLEN: %d\nNB: %d\nData: [", static_cast<uint32_t>(m_id), m_len, m_number);
 
-        for (uint16_t i = 0; i < m_len; i++)
-        {
-            if (i == m_len - 1)
-            {
-                printf("%d", m_data[i]);
-            }
-            else
-            {
-                printf("%d ,", m_data[i]);
-            }
-        }
+        // for (uint16_t i = 0; i < m_len; i++)
+        // {
+        //     if (i == m_len - 1)
+        //     {
+        //         printf("%d", m_data[i]);
+        //     }
+        //     else
+        //     {
+        //         printf("%d ,", m_data[i]);
+        //     }
+        // }
 
         printf("]\n");
     }

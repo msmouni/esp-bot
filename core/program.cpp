@@ -21,6 +21,10 @@ MainProgram::MainProgram()
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     m_wifi = new Wifi(wifi_setting, tcp_ip_server_config);
+
+#if ESP_CAMERA_SUPPORTED
+    m_tmp_pic_frame = Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>>();
+#endif
 }
 
 MainProgram::~MainProgram()
@@ -103,7 +107,8 @@ void MainProgram::run(void)
             break;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100)); // 100 ms
+        vTaskDelay(pdMS_TO_TICKS(10)); // 1 ms
+        // vTaskDelay(pdMS_TO_TICKS(100)); // 100 ms
     }
 }
 
@@ -112,7 +117,28 @@ void MainProgram::update()
     if (m_state == MainState::Running)
     {
 #if ESP_CAMERA_SUPPORTED
-        if (m_camera
+        if (m_tmp_pic_frame.isSome())
+        {
+            if (m_wifi->tryToSendMsg(m_tmp_pic_frame.getData()))
+            {
+                m_tmp_pic_frame.removeData();
+            }
+        }
+        else
+        {
+            Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> opt_pic_frame = m_camera.getNextFrame();
+            if (opt_pic_frame.isSome())
+            {
+                ServerFrame<TcpIpServer::MAX_MSG_SIZE> pic_frame = opt_pic_frame.getData();
+
+                // pic_frame.debug();
+                if (!m_wifi->tryToSendMsg(pic_frame))
+                {
+                    m_tmp_pic_frame.setData(pic_frame);
+                }
+            }
+        }
+        /*if (m_camera
                 .isPicAvailable())
         {
             bool done_sending = false;
@@ -129,7 +155,7 @@ void MainProgram::update()
                     done_sending = true;
                 }
             }
-        }
+        }*/
 #endif
         if (m_wifi->update() == WifiResult::Err)
         {

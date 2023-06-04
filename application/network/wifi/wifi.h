@@ -81,7 +81,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
     WifiState getState(void);
     static void log(const char *debug_msg);
 
-    void tryToSendMsg(ServerFrame<TcpIpServer::MAX_MSG_SIZE>);
+    bool tryToSendMsg(ServerFrame<TcpIpServer::MAX_MSG_SIZE>);
 };
 
 #endif // WIFI_H
