@@ -109,6 +109,8 @@ esp_err_t Wifi::init()
 
         // create wifi access point in the wifi driver
         m_netiface.m_ap_netif = esp_netif_create_default_wifi_ap();
+        // m_netiface.setAPIp(); // To test: either before starting iface or after
+
         // create wifi station in the wifi driver
         m_netiface.m_sta_netif = esp_netif_create_default_wifi_sta();
 
@@ -223,7 +225,11 @@ ServerError Wifi::startTcpServer()
 {
     if (getState() == WifiState::Connected)
     {
-        m_tcp_ip_server.start(ServerSocketDesc(m_netiface.m_setting.m_sta_setting.m_ip_config.ip, m_server_config.m_socket_port), m_server_config.m_login);
+        // TODO: check if STA/AP has started
+        Option<ServerSocketDesc> ap_socket_desc = Option<ServerSocketDesc>(ServerSocketDesc(m_netiface.m_setting.m_ap_setting.m_ip_config.ip, m_server_config.m_ap_socket_port));
+        Option<ServerSocketDesc> sta_socket_desc = Option<ServerSocketDesc>(ServerSocketDesc(m_netiface.m_setting.m_sta_setting.m_ip_config.ip, m_server_config.m_sta_socket_port));
+
+        m_tcp_ip_server.start(ApStaSocketsDesc(ap_socket_desc, sta_socket_desc), m_server_config.m_login);
 
         return ServerError::None;
     }

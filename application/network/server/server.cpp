@@ -16,30 +16,19 @@ void TcpIpServer::tryToSendMsg_25ms(void *args)
     m_pending_send_msg.push(status_frame);
 }
 
-void setSocketNonBlocking(int socket_desc)
-{
-    /* NON-BLOCKING FLAG:
-        1- Call the fcntl() API to retrieve the socket descriptor's current flag settings into a local variable.
-        2- In our local variable, set the O_NONBLOCK (non-blocking) flag on. (being careful, of course, not to tamper with the other flags)
-        3- Call the fcntl() API to set the flags for the descriptor to the value in our local variable.
-    */
-    int flags = fcntl(socket_desc, F_GETFL) | O_NONBLOCK;
-    fcntl(socket_desc, F_SETFL, flags);
-}
-
 TcpIpServer::TcpIpServer()
 {
     m_state = ServerState::NotStarted;
 }
 TcpIpServer::~TcpIpServer()
 {
-    close(m_socket);
+    m_socket_handler.stop();
     delete m_timer_send_25ms;
 }
 
-void TcpIpServer::start(ServerSocketDesc socket_desc, ServerLogin login)
+void TcpIpServer::start(ApStaSocketsDesc sockets_desc, ServerLogin login)
 {
-    m_socket_desc = socket_desc;
+    m_socket_handler.start(sockets_desc);
     m_clients.setServerLogin(login);
     m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg_25ms, NULL, 25000);
     m_state = ServerState::Uninitialized;
@@ -49,8 +38,7 @@ void TcpIpServer::stop()
 {
     if ((m_state != ServerState::NotStarted) & (m_state != ServerState::Uninitialized))
     {
-        // According to manual: Upon successful completion, 0 shall be returned; otherwise, -1 shall be returned and errno set to indicate the error.
-        close(m_socket);
+        m_socket_handler.stop();
     }
 
     if (m_state == ServerState::Running)
@@ -67,48 +55,21 @@ ServerError TcpIpServer::update()
     {
     case ServerState::Uninitialized:
     {
-        m_socket = socket(AF_INET, SOCK_STREAM, 0);
-
-        if (m_socket < 0)
+        if (m_socket_handler.update() == SocketsHandlerError::ErrorOnApSta)
         {
-            ESP_LOGE(SERVER_TAG, "Failed to create a socket...");
-            m_error = ServerError::CannotCreateSocket;
+            m_error = ServerError::SocketError;
             m_state = ServerState::Error;
-            return ServerError::CannotCreateSocket;
+            return ServerError::SocketError;
         }
-
-        setSocketNonBlocking(m_socket);
-
-        ESP_LOGI(SERVER_TAG, "TCP/IP Server Created");
-
-        m_state = ServerState::SocketCreated;
+        else if (m_socket_handler.isListening())
+        {
+            m_state = ServerState::SocketsListening;
+        }
 
         break;
     }
-    case ServerState::SocketCreated:
+    case ServerState::SocketsListening:
     {
-        if (bind(m_socket, (struct sockaddr *)&m_socket_desc.addr, m_socket_addr_len) < 0)
-        {
-            ESP_LOGE(SERVER_TAG, "Failed to bind socket...");
-            m_error = ServerError::CannotBindSocket;
-            m_state = ServerState::Error;
-            return ServerError::CannotBindSocket;
-        }
-
-        m_state = ServerState::SocketBound;
-
-        break;
-    }
-    case ServerState::SocketBound:
-    {
-        if (listen(m_socket, NB_ALLOWED_CLIENTS) < 0)
-        {
-            ESP_LOGE(SERVER_TAG, "Cannot listen on socket...");
-            m_error = ServerError::CannotListenOnSocket;
-            m_state = ServerState::Error;
-            return ServerError::CannotListenOnSocket;
-        }
-
         esp_err_t res_strt = m_timer_send_25ms->start();
         if (res_strt != ESP_OK)
         {
@@ -158,23 +119,16 @@ void TcpIpServer::tryToConnetClient()
     if (opt_next_client_addr
             .isSome())
     {
-        // (m_nb_connected_clients < NB_ALLOWED_CLIENTS)
+        // (m_nb_connected_clients < NB_ALLOWED_CLIENTS) : handled in Clients
 
         sockaddr_in *next_client_addr = opt_next_client_addr.getData();
 
-        /*
-        On success, these system calls return a file descriptor for the
-        accepted socket (a nonnegative integer).  On error, -1 is
-        returned, errno is set to indicate the error, and addrlen is left
-        unchanged.
-        */
-        int client_socket = accept(m_socket, (sockaddr *)next_client_addr, &m_socket_addr_len);
+        Option<int> res_connect_client = m_socket_handler.tryToConnetClient(next_client_addr);
 
-        if (client_socket >= 0)
+        if (res_connect_client
+                .isSome())
         {
-            setSocketNonBlocking(client_socket);
-
-            m_clients.addClient(client_socket);
+            m_clients.addClient(res_connect_client.getData());
 
             ESP_LOGI(SERVER_TAG, "Client connected: IP: %s | Port: %d\n", inet_ntoa(next_client_addr->sin_addr), (int)ntohs(next_client_addr->sin_port));
         }

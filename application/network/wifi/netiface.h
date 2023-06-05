@@ -27,17 +27,21 @@ struct NetworkIface
 
     void setIp(esp_netif_t *netif, IpConfig *ip_config)
     {
-        if (esp_netif_dhcpc_stop(netif) != ESP_OK)
+    }
+
+    void setStaIp()
+    {
+        if (esp_netif_dhcpc_stop(m_sta_netif) != ESP_OK)
         {
             ESP_LOGE(M_LOG_TAG, "Failed to stop dhcp client");
             return;
         }
         esp_netif_ip_info_t ip = {};
         memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-        ip.ip.addr = ipaddr_addr(ip_config->ip);
-        ip.netmask.addr = ipaddr_addr(ip_config->mask);
-        ip.gw.addr = ipaddr_addr(ip_config->gw);
-        if (esp_netif_set_ip_info(netif, &ip) != ESP_OK)
+        ip.ip.addr = ipaddr_addr(m_setting.m_sta_setting.m_ip_config.ip);
+        ip.netmask.addr = ipaddr_addr(m_setting.m_sta_setting.m_ip_config.mask);
+        ip.gw.addr = ipaddr_addr(m_setting.m_sta_setting.m_ip_config.gw);
+        if (esp_netif_set_ip_info(m_sta_netif, &ip) != ESP_OK)
         {
             ESP_LOGE(M_LOG_TAG, "Failed to set ip info");
             return;
@@ -45,17 +49,31 @@ struct NetworkIface
 
         // As DNS
         // Router Address: GateWay
-        setDnsServerInfos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_MAIN);
-        setDnsServerInfos(netif, ipaddr_addr(ip_config->gw), ESP_NETIF_DNS_BACKUP);
-    }
-
-    void setStaIp()
-    {
-        setIp(m_sta_netif, &m_setting.m_sta_setting.m_ip_config);
+        setDnsServerInfos(m_sta_netif, ipaddr_addr(m_setting.m_sta_setting.m_ip_config.gw), ESP_NETIF_DNS_MAIN);
+        setDnsServerInfos(m_sta_netif, ipaddr_addr(m_setting.m_sta_setting.m_ip_config.gw), ESP_NETIF_DNS_BACKUP);
     }
 
     void setAPIp()
     {
-        setIp(m_ap_netif, &m_setting.m_ap_setting.m_ip_config);
+        esp_netif_ip_info_t ip = {};
+        memset(&ip, 0, sizeof(esp_netif_ip_info_t));
+        ip.ip.addr = ipaddr_addr(m_setting.m_ap_setting.m_ip_config.ip);
+        ip.netmask.addr = ipaddr_addr(m_setting.m_ap_setting.m_ip_config.mask);
+        ip.gw.addr = ipaddr_addr(m_setting.m_ap_setting.m_ip_config.gw);
+        esp_netif_dhcps_stop(m_ap_netif);
+        esp_netif_set_ip_info(m_ap_netif, &ip);
+        esp_netif_dhcps_start(m_ap_netif);
+
+        // Note: Works if we don't start dhcps at the end (to verify Ips ...)
+
+        esp_netif_dhcp_status_t c_status;
+        esp_netif_dhcp_status_t s_status;
+
+        esp_err_t c_res = esp_netif_dhcpc_get_status(m_ap_netif, &c_status);
+        esp_err_t s_res = esp_netif_dhcps_get_status(m_ap_netif, &s_status);
+
+        // Before start: (c_res:258 | c_status:0) | (s_res:0 | s_status:0)
+        // After Start: (c_res:258 | c_status:1073484928) | (s_res:0 | s_status:1)
+        printf("HEEEEEEEEEEERE: (c_res:%d | c_status:%d) | (s_res:%d | s_status:%d)", c_res, c_status, s_res, s_status);
     }
 };
