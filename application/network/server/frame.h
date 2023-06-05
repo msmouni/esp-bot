@@ -25,7 +25,7 @@ private:
 
 public:
     ServerFrame(){};
-    ServerFrame(ServerFrameId id, uint8_t len, uint8_t (&data)[MaxFrameLen - 5]) : m_id(id), m_len(len)
+    ServerFrame(ServerFrameId id, uint8_t len, char (&data)[MaxFrameLen - 5]) : m_id(id), m_len(len)
     {
         for (uint8_t i = 0; i < MaxFrameLen - 5; i++)
         {
@@ -105,6 +105,95 @@ public:
     uint8_t (&getData())[MaxFrameLen - 5]
     {
         return m_data;
+    }
+};
+
+//////////////////////////////////////////////////////////////////////
+// TODO: Move later to a shared submodule or use xml file parsing
+enum class AuthentificationRequest : uint8_t
+{
+    LogIn = 1,
+    LogOut = 2,
+};
+
+struct AuthFrameData
+{
+    static const uint8_t MAX_LOGIN_PASS_LEN = 126;
+    AuthentificationRequest m_auth_req;
+    char m_login_password[MAX_LOGIN_PASS_LEN];
+
+    AuthFrameData(char *bytes)
+    {
+        m_auth_req = static_cast<AuthentificationRequest>((uint8_t)*bytes);
+
+        bytes++;
+
+        // Note: https://stackoverflow.com/questions/26456813/will-a-char-array-differ-in-ordering-in-a-little-endian-or-big-endian-system
+        // Copy
+        uint8_t login_pass_len = std::min(strlen(bytes) + 1,
+                                          (unsigned int)MAX_LOGIN_PASS_LEN); // +1 for '\0'
+        memcpy(m_login_password, bytes, login_pass_len);
+    }
+
+    AuthFrameData(AuthentificationRequest auth_req, char *login_password)
+    {
+        m_auth_req = auth_req;
+
+        // Copy
+        uint8_t login_pass_len = std::min(strlen(login_password) + 1,
+                                          (unsigned int)MAX_LOGIN_PASS_LEN); // +1 for '\0'
+        memcpy(m_login_password, login_password, login_pass_len);
+    }
+
+    uint8_t toBytes(char *bytes)
+    {
+
+        *bytes = (uint8_t)m_auth_req;
+
+        bytes++;
+
+        memcpy(bytes, m_login_password, MAX_LOGIN_PASS_LEN);
+
+        return MAX_LOGIN_PASS_LEN + 1;
+    }
+};
+
+///////////////////////////////:
+
+enum class AuthentificationType : uint8_t
+{
+    Undefined,
+    AsClient,
+    AsSuperClient,
+};
+
+// To complete later
+struct StatusFrameData
+{
+    AuthentificationType m_auth_type;
+
+    StatusFrameData()
+    {
+        m_auth_type = AuthentificationType::Undefined;
+    }
+
+    StatusFrameData(char *bytes)
+    {
+        m_auth_type = static_cast<AuthentificationType>(*bytes);
+
+        // bytes++;
+    }
+
+    StatusFrameData(AuthentificationType auth_type)
+    {
+        m_auth_type = auth_type;
+    }
+
+    uint8_t toBytes(char *bytes)
+    {
+        *bytes = (uint8_t)m_auth_type;
+
+        return 1;
     }
 };
 

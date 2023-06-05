@@ -2,8 +2,9 @@ enum class ServerState
 {
     NotStarted,
     Uninitialized,
-    SocketCreated,
-    SocketBound,
+    // SocketCreated,
+    // SocketBound,
+    SocketsListening,
     Running,
     Error,
 };

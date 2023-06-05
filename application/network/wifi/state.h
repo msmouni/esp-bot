@@ -24,6 +24,7 @@ enum class WifiState
     Disconnected,
     Error,
 };
+// Todo State for both Sta and Ap
 
 struct WifiStateHandler
 {
