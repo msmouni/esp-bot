@@ -59,7 +59,7 @@ public:
         }
         else
         {
-            Option<T> result = Option(m_data[m_head]);
+            Option<T> result = Option<T>(m_data[m_head]);
             m_nb_element--;
             m_head++;
             if (m_head == Capacity)

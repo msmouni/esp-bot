@@ -4,15 +4,6 @@ CircularBuffer<StatusFrameData, 10> TcpIpServer::m_pending_status_data = {};
 
 void TcpIpServer::tryToSendMsg_25ms(void *args)
 {
-    // // TMP
-    // uint8_t data[MAX_MSG_SIZE - 5] = {0};
-    // data[0] = 1;
-    // data[1] = 2;
-    // data[2] = 3;
-    // data[3] = 4;
-    // data[4] = 5;
-    // ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Status, 5, data);
-
     StatusFrameData status_data = StatusFrameData();
 
     m_pending_status_data.push(status_data);
@@ -93,11 +84,6 @@ ServerError TcpIpServer::update()
     {
 
         tryToConnetClient();
-
-        // if (!m_pending_status_data.isEmpty())
-        // {
-        //     tryToSendMsg(m_pending_status_data.get().getData());
-        // }
 
         if (!m_pending_status_data.isEmpty())
         {

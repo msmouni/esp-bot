@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -25,7 +28,6 @@ private:
     // static CircularBuffer<ServerFrame<MAX_MSG_SIZE>, 50> m_pending_send_msg;
     static CircularBuffer<StatusFrameData, 10> m_pending_status_data;
 
-    // SocketsHandler<NB_ALLOWED_CLIENTS> m_sockets_handler; // TODO
     SocketsHandler m_socket_handler = SocketsHandler(NB_ALLOWED_CLIENTS);
 
     Clients<NB_ALLOWED_CLIENTS, MAX_MSG_SIZE> m_clients = {};
@@ -55,3 +57,5 @@ public:
 
     ServerError update();
 };
+
+#endif // SERVER_H

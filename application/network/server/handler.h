@@ -70,27 +70,6 @@ public:
     Option<int> tryToConnetClient(sockaddr_in *);
 };
 
-// struct ApStaSocketsError
-// {
-//     SocketError m_ap;
-//     SocketError m_sta;
-
-//     ApStaSocketsError() : m_ap(SocketError::None), m_sta(SocketError::None){};
-
-//     bool hasApError()
-//     {
-//         return (m_ap != SocketError::None);
-//     }
-//     bool hasStaError()
-//     {
-//         return (m_sta != SocketError::None);
-//     }
-//     bool hasApStaError()
-//     {
-//         return hasApError() || hasStaError();
-//     }
-// };
-
 enum class ApStaSocketsState
 {
     NotStarted,
@@ -126,7 +105,6 @@ class SocketsHandler
     uint8_t m_nb_allowed_clients;
 
 public:
-    /// SocketsHandler(NbAllowedClients)
     SocketsHandler(uint8_t);
     ~SocketsHandler();
 

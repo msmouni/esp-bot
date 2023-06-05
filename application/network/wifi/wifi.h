@@ -1,3 +1,6 @@
+#ifndef WIFI_H
+#define WIFI_H
+
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -78,3 +81,5 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
     WifiState getState(void);
     static void log(const char *debug_msg);
 };
+
+#endif // WIFI_H

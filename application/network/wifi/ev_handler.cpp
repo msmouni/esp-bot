@@ -30,22 +30,6 @@ void EvHandler::handle(void *arg, esp_event_base_t event_base,
 void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
                                  int32_t event_id, void *event_data)
 {
-    //     ESP_LOGI(M_LOG_TAG, "event_base:%s |event_id:%ld", event_base, event_id);
-
-    //     if (event_id == WIFI_EVENT_AP_STACONNECTED)
-    //     {
-    //         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
-    //         ESP_LOGI(TAG, "station " MACSTR " join, AID=%d",
-    //                  MAC2STR(event->mac), event->aid);
-    //     }
-    //     else if (event_id == WIFI_EVENT_AP_STADISCONNECTED)
-    //     {
-    //         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
-    //         ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d",
-    //                  MAC2STR(event->mac), event->aid);
-    //     }
-    // }
-
     if (WIFI_EVENT == event_base)
     {
         const wifi_event_t event_type{static_cast<wifi_event_t>(event_id)}; // cast int32_t -> wifi_event_t
@@ -74,13 +58,13 @@ void EvHandler::wifiEventHandler(void *arg, esp_event_base_t event_base,
 
                 network_iface->setStaIp();
 
-                // setStaticIp(network_iface->m_sta_netif, &network_iface->m_setting.m_sta_setting.m_ip_config);
-
                 break;
             }
             case IpSetting::Dhcp:
             {
                 m_state_handler->changeState(WifiState::WaitingForIp);
+
+                break;
             }
 
             default:

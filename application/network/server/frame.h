@@ -43,7 +43,7 @@ public:
         // Endianness ...
         m_id = static_cast<ServerFrameId>((uint32_t(bytes_frame[0]) << 24) | (uint32_t(bytes_frame[1]) << 16) | (uint32_t(bytes_frame[2]) << 8) | (uint32_t(bytes_frame[3])));
 
-        m_len = std::min(bytes_frame[4], MaxFrameLen);
+        m_len = std::min(bytes_frame[4], uint8_t(MaxFrameLen - 5));
 
         for (uint8_t i = 0; i < m_len; i++)
         {

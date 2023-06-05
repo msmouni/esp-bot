@@ -64,16 +64,10 @@ struct NetworkIface
         esp_netif_set_ip_info(m_ap_netif, &ip);
         esp_netif_dhcps_start(m_ap_netif);
 
-        // Note: Works if we don't start dhcps at the end (to verify Ips ...)
-
-        esp_netif_dhcp_status_t c_status;
+        /*esp_netif_dhcp_status_t c_status;
         esp_netif_dhcp_status_t s_status;
 
         esp_err_t c_res = esp_netif_dhcpc_get_status(m_ap_netif, &c_status);
-        esp_err_t s_res = esp_netif_dhcps_get_status(m_ap_netif, &s_status);
-
-        // Before start: (c_res:258 | c_status:0) | (s_res:0 | s_status:0)
-        // After Start: (c_res:258 | c_status:1073484928) | (s_res:0 | s_status:1)
-        printf("HEEEEEEEEEEERE: (c_res:%d | c_status:%d) | (s_res:%d | s_status:%d)", c_res, c_status, s_res, s_status);
+        esp_err_t s_res = esp_netif_dhcps_get_status(m_ap_netif, &s_status);*/
     }
 };
