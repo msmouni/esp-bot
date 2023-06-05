@@ -26,11 +26,14 @@ private:
 
     // Configuration
     static wifi_init_config_t m_wifi_init_config;
-    wifi_config_t m_wifi_config = {}; // All element as Default : https://iq.opengenus.org/different-ways-to-initialize-array-in-cpp/
+    WifiConfig m_config = {};
 
     // static char mac_addr_cstr[13]; // Buffer to hold MAC as cstring
 
-    void create(SsidPassword);
+    // void create(SsidPassword);
+    void configure_sta(StaSetting &);
+    void configure_ap(ApSetting &);
+    void configure(WifiSetting &);
 
     static EvHandler m_ev_handler;
 
@@ -58,8 +61,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
 
 "Rule Of Three":
 */
-    Wifi(DhcpSetting, ServerConfig);
-    Wifi(StaticIpSetting, ServerConfig);
+    Wifi(WifiSetting, ServerConfig);
     ~Wifi(void) = default;
     Wifi(const Wifi &) = default;
     Wifi &operator=(const Wifi &) = default;
