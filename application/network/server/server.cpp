@@ -1,19 +1,21 @@
 #include "server.h"
 
-CircularBuffer<ServerFrame<TcpIpServer::MAX_MSG_SIZE>, 50> TcpIpServer::m_pending_send_msg = {};
+CircularBuffer<StatusFrameData, 10> TcpIpServer::m_pending_status_data = {};
 
 void TcpIpServer::tryToSendMsg_25ms(void *args)
 {
-    // TMP
-    uint8_t data[MAX_MSG_SIZE - 5] = {0};
-    data[0] = 1;
-    data[1] = 2;
-    data[2] = 3;
-    data[3] = 4;
-    data[4] = 5;
-    ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Status, 5, data);
+    // // TMP
+    // uint8_t data[MAX_MSG_SIZE - 5] = {0};
+    // data[0] = 1;
+    // data[1] = 2;
+    // data[2] = 3;
+    // data[3] = 4;
+    // data[4] = 5;
+    // ServerFrame<MAX_MSG_SIZE> status_frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::Status, 5, data);
 
-    m_pending_send_msg.push(status_frame);
+    StatusFrameData status_data = StatusFrameData();
+
+    m_pending_status_data.push(status_data);
 }
 
 TcpIpServer::TcpIpServer()
@@ -92,9 +94,14 @@ ServerError TcpIpServer::update()
 
         tryToConnetClient();
 
-        if (!m_pending_send_msg.isEmpty())
+        // if (!m_pending_status_data.isEmpty())
+        // {
+        //     tryToSendMsg(m_pending_status_data.get().getData());
+        // }
+
+        if (!m_pending_status_data.isEmpty())
         {
-            tryToSendMsg(m_pending_send_msg.get().getData());
+            tryToSendStatus(m_pending_status_data.get().getData());
         }
 
         m_clients.update();
@@ -159,4 +166,9 @@ void TcpIpServer::tryToRecvMsg()
 void TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
 {
     m_clients.sendMsg(frame);
+}
+
+void TcpIpServer::tryToSendStatus(StatusFrameData status_data)
+{
+    m_clients.sendStatus(status_data);
 }

@@ -29,6 +29,7 @@ private:
     CircularBuffer<ServerFrame<MaxFrameLen>, RxBufferSize> rx_frames_buffer; // From client taking control
     static const uint8_t TxBufferSize = 50;
     CircularBuffer<ServerFrame<MaxFrameLen>, TxBufferSize> tx_frames_buffer; // To all authentified clients
+    CircularBuffer<StatusFrameData, 10> m_status_data_to_send;
 
     Option<struct sockaddr_in *> getClientAddr(uint8_t);
     void deleteClient(uint8_t);
@@ -48,6 +49,7 @@ public:
     void update();
     Option<ServerFrame<MaxFrameLen>> getRecvMsg();
     ClientsError sendMsg(ServerFrame<MaxFrameLen>);
+    ClientsError sendStatus(StatusFrameData);
     Option<uint8_t> getClientTakingControl();
 };
 
@@ -135,19 +137,60 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendMsg(ServerFrame<MaxFram
 }
 
 template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendStatus(StatusFrameData status_data)
+{
+    if (m_status_data_to_send.push(status_data))
+    {
+        return ClientsError::None;
+    }
+    else
+    {
+        return ClientsError::FullTxBuffer;
+    }
+}
+
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::update()
 {
 
     Option<ServerFrame<MaxFrameLen>> opt_msg = tx_frames_buffer.get();
+    Option<StatusFrameData> opt_status_data = m_status_data_to_send.get();
 
     for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
     {
         ClientState client_state = m_clients[client_idx].getState();
 
+        if ((opt_status_data.isSome()) & ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl)))
+        {
+
+            StatusFrameData status_frame = opt_status_data.getData();
+            if (client_state == ClientState::Authenticated)
+            {
+                status_frame.m_auth_type = AuthentificationType::AsClient;
+            }
+            else if (client_state == ClientState::TakingControl)
+            {
+                status_frame.m_auth_type = AuthentificationType::AsSuperClient;
+            }
+
+            char bytes[MaxFrameLen - 5];
+
+            uint8_t frame_len = status_frame.toBytes(bytes);
+
+            ServerFrame<MaxFrameLen> frame = ServerFrame<MaxFrameLen>(ServerFrameId::Status, frame_len, bytes);
+
+            Result<int, ClientError> res = m_clients[client_idx].tryToSendMsg(frame);
+            if (res
+                    .isErr())
+            {
+                deleteClient(client_idx);
+                return; // TODO: continue for others
+            }
+        }
+
         // Send Messages to all authentified clients
         if ((opt_msg.isSome()) & ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl)))
         {
-
             Result<int, ClientError> res = m_clients[client_idx].tryToSendMsg(opt_msg.getData());
             if (res
                     .isErr())
@@ -191,35 +234,41 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                             // TO VERIFY: reinterpret_cast
                             char *msg_data = reinterpret_cast<char *>(msg.getData());
 
-                            switch (server_login.check(msg_data))
+                            AuthFrameData auth_data = AuthFrameData(msg_data);
+
+                            if (auth_data.m_auth_req == AuthentificationRequest::LogIn)
                             {
-                            case LoginResult::Client:
-                            {
-                                // ESP_LOGI(CLIENTS_TAG, "Client_%d(%s:%d) Logged as Client\n", client_idx, inet_ntoa(m_clients[0].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
-                                printf("Client_%d(%s:%d) Logged as Client\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
-                                m_clients[client_idx].login();
-                                break;
-                            }
-                            case LoginResult::SuperClient:
-                            {
-                                if (m_client_taking_control.isNone())
+
+                                switch (server_login.check(auth_data.m_login_password))
                                 {
-                                    printf("Client_%d(%s:%d) Logged as SuperClient\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
-                                    m_clients[client_idx].takeControl();
-
-                                    m_client_taking_control.setData(client_idx);
+                                case LoginResult::Client:
+                                {
+                                    // ESP_LOGI(CLIENTS_TAG, "Client_%d(%s:%d) Logged as Client\n", client_idx, inet_ntoa(m_clients[0].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                    printf("Client_%d(%s:%d) Logged as Client\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                    m_clients[client_idx].login();
+                                    break;
                                 }
-                                break;
-                            }
-                            case LoginResult::WrongLogin:
-                            {
-                                printf("Client_%d(%s:%d) tried to Log using wrong Login\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                case LoginResult::SuperClient:
+                                {
+                                    if (m_client_taking_control.isNone())
+                                    {
+                                        printf("Client_%d(%s:%d) Logged as SuperClient\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+                                        m_clients[client_idx].takeControl();
 
-                                break;
-                            }
+                                        m_client_taking_control.setData(client_idx);
+                                    }
+                                    break;
+                                }
+                                case LoginResult::WrongLogin:
+                                {
+                                    printf("Client_%d(%s:%d) tried to Log using wrong Login\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
 
-                            default:
-                                break;
+                                    break;
+                                }
+
+                                default:
+                                    break;
+                                }
                             }
                         }
                     }
@@ -228,9 +277,19 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                 }
                 case ClientState::Authenticated:
                 {
-                    if ((msg.getId() == ServerFrameId::Authentification) & (msg.getLen() == 0))
+                    if (msg.getId() == ServerFrameId::Authentification)
                     {
-                        m_clients[client_idx].logout();
+                        // TO VERIFY: reinterpret_cast
+                        char *msg_data = reinterpret_cast<char *>(msg.getData());
+
+                        AuthFrameData auth_data = AuthFrameData(msg_data);
+
+                        if (auth_data.m_auth_req == AuthentificationRequest::LogOut)
+                        {
+                            printf("Client_%d(%s:%d) LogOut\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+
+                            m_clients[client_idx].logout();
+                        }
                     }
                     break;
                 }
@@ -238,8 +297,15 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                 {
                     if (msg.getId() == ServerFrameId::Authentification)
                     {
-                        if (msg.getLen() == 0)
+                        // TO VERIFY: reinterpret_cast
+                        char *msg_data = reinterpret_cast<char *>(msg.getData());
+
+                        AuthFrameData auth_data = AuthFrameData(msg_data);
+
+                        if (auth_data.m_auth_req == AuthentificationRequest::LogOut)
                         {
+                            printf("Client_%d(%s:%d) LogOut\n", m_clients[client_idx].getId(), inet_ntoa(m_clients[client_idx].getAddrRef()->sin_addr), (int)ntohs(m_clients[client_idx].getAddrRef()->sin_port));
+
                             m_client_taking_control.removeData();
                             m_clients[client_idx].logout();
                         }

@@ -22,7 +22,8 @@ private:
     constexpr static const char *SERVER_TAG = "SERVER";
 
     static const int MAX_MSG_SIZE = 128; // To adjust later reg Msgs to send
-    static CircularBuffer<ServerFrame<MAX_MSG_SIZE>, 50> m_pending_send_msg;
+    // static CircularBuffer<ServerFrame<MAX_MSG_SIZE>, 50> m_pending_send_msg;
+    static CircularBuffer<StatusFrameData, 10> m_pending_status_data;
 
     // SocketsHandler<NB_ALLOWED_CLIENTS> m_sockets_handler; // TODO
     SocketsHandler m_socket_handler = SocketsHandler(NB_ALLOWED_CLIENTS);
@@ -42,6 +43,7 @@ private:
     void tryToRecvMsg();
 
     void tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
+    void tryToSendStatus(StatusFrameData);
 
     static void tryToSendMsg_25ms(void *);
 
