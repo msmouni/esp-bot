@@ -20,6 +20,6 @@ jobs:
       # https://github.com/espressif/esp-idf-ci-action
       uses: espressif/esp-idf-ci-action@v1
       with:
-        esp_idf_version: v4.4
+        esp_idf_version: latest
         target: esp32
         path: '.'
