@@ -1,5 +1,7 @@
 #include "main.h"
 
+static MainProgram main_prog;
+
 /*
     Name mangling:
         extern "C" makes a function-name in C++ have C linkage (compiler does not mangle the name)
@@ -16,4 +18,5 @@
 
 extern "C" void app_main(void)
 {
+    main_prog.run();
 }
