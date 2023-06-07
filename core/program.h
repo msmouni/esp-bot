@@ -21,7 +21,7 @@ private:
     Wifi *m_wifi = NULL;
 #if ESP_CAMERA_SUPPORTED
     Camera m_camera = Camera();
-    Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> m_tmp_pic_frame;
+    // Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> m_tmp_pic_frame;
 #endif
 
 public:

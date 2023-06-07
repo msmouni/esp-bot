@@ -15,6 +15,8 @@ enum class ServerFrameId : uint32_t
     Debug = 0xFF,
 };
 
+const uint16_t SERVER_FRAME_HEADER_SIZE = 7;
+
 // ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH[2], uint8_t FRAME_NUMBER, uint8_t DATA[DATA_LEN]]
 template <uint16_t MaxFrameLen>
 class ServerFrame
@@ -23,10 +25,10 @@ private:
     ServerFrameId m_id;
     uint16_t m_len;
     uint8_t m_number; // Decreasing number (0 means last Frame)
-    uint8_t m_data[MaxFrameLen - 7] = {0};
-    void fillData(char (&data)[MaxFrameLen - 7])
+    uint8_t m_data[MaxFrameLen - SERVER_FRAME_HEADER_SIZE] = {0};
+    void fillData(char (&data)[MaxFrameLen - SERVER_FRAME_HEADER_SIZE])
     {
-        for (uint8_t i = 0; i < MaxFrameLen - 7; i++)
+        for (uint8_t i = 0; i < MaxFrameLen - SERVER_FRAME_HEADER_SIZE; i++)
         {
             m_data[i] = data[i];
         }
@@ -34,13 +36,16 @@ private:
 
 public:
     ServerFrame(){};
-    ServerFrame(ServerFrameId id, uint16_t len, uint8_t number, char (&data)[MaxFrameLen - 7]) : m_id(id), m_len(len), m_number(number)
+    ServerFrame(ServerFrameId id, uint16_t len, uint8_t number, char (&data)[MaxFrameLen - SERVER_FRAME_HEADER_SIZE]) : m_id(id), m_len(len), m_number(number)
     {
         fillData(data);
     };
-    ServerFrame(ServerFrameId id, uint16_t len, char (&data)[MaxFrameLen - 7]) : m_id(id), m_len(len), m_number(0)
+    ServerFrame(ServerFrameId id, uint16_t len, char (&data)[MaxFrameLen - SERVER_FRAME_HEADER_SIZE]) : m_id(id), m_len(len), m_number(0)
     {
         fillData(data);
+    }
+    ServerFrame(ServerFrameId id) : m_id(id)
+    {
     }
     ~ServerFrame(){};
 
@@ -54,13 +59,13 @@ public:
         m_id = static_cast<ServerFrameId>((uint32_t(bytes_frame[0]) << 24) | (uint32_t(bytes_frame[1]) << 16) | (uint32_t(bytes_frame[2]) << 8) | (uint32_t(bytes_frame[3])));
 
         uint16_t frame_len = ((uint16_t)(bytes_frame[4]) << 8) | (uint16_t)(bytes_frame[5]);
-        m_len = std::min(frame_len, (uint16_t)(MaxFrameLen - 7));
+        m_len = std::min(frame_len, (uint16_t)(MaxFrameLen - SERVER_FRAME_HEADER_SIZE));
 
         m_number = bytes_frame[6];
 
         for (uint8_t i = 0; i < m_len; i++)
         {
-            m_data[i] = bytes_frame[i + 7];
+            m_data[i] = bytes_frame[i + SERVER_FRAME_HEADER_SIZE];
         }
     }
 
@@ -83,9 +88,9 @@ public:
 
         buffer[6] = m_number;
 
-        for (uint8_t i = 7; i < MaxFrameLen; i++)
+        for (uint8_t i = SERVER_FRAME_HEADER_SIZE; i < MaxFrameLen; i++)
         {
-            buffer[i] = m_data[i - 7];
+            buffer[i] = m_data[i - SERVER_FRAME_HEADER_SIZE];
         }
     }
 
@@ -123,9 +128,36 @@ public:
         return m_number;
     }
 
-    uint8_t (&getData())[MaxFrameLen - 7]
+    uint8_t (&getData())[MaxFrameLen - SERVER_FRAME_HEADER_SIZE]
     {
         return m_data;
+    }
+
+    static void setHeader(uint8_t (&buffer)[SERVER_FRAME_HEADER_SIZE], ServerFrameId id, uint16_t len, uint8_t number)
+    {
+        // uint8_t[SERVER_FRAME_HEADER_SIZE] buffer;
+
+        uint32_t id_uint32 = static_cast<uint32_t>(id);
+        // Endianness ...
+        buffer[0] = static_cast<uint8_t>(id_uint32 >> 24);
+        buffer[1] = static_cast<uint8_t>(id_uint32 >> 16);
+        buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
+        buffer[3] = static_cast<uint8_t>(id_uint32);
+
+        buffer[4] = static_cast<uint8_t>(len >> 8);
+        buffer[5] = static_cast<uint8_t>(len);
+
+        buffer[6] = number;
+
+        // return buffer;
+    }
+
+    uint16_t setData(uint8_t *data_buff, uint16_t data_len)
+    {
+        uint16_t len_to_copy = std::min(data_len, (uint16_t)(MaxFrameLen - SERVER_FRAME_HEADER_SIZE));
+        memcpy(m_data, data_buff, len_to_copy);
+
+        return len_to_copy;
     }
 };
 

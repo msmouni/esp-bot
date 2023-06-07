@@ -64,7 +64,7 @@ esp_err_t Camera::init()
         return err;
     }
 
-    m_timer_send_100ms = new PeriodicTimer("Camera_Take_Pic_100ms", takePic100ms, NULL, 10000);
+    m_timer_send_100ms = new PeriodicTimer("Camera_Take_Pic_100ms", takePic100ms, NULL, 100000);
     err = m_timer_send_100ms->start();
 
     if (err != ESP_OK)
@@ -74,6 +74,7 @@ esp_err_t Camera::init()
         return err;
     }
 
+    ESP_LOGI(TAG, "Camera Timer Started");
     return ESP_OK;
 }
 
@@ -82,7 +83,22 @@ bool Camera::isPicAvailable()
     return m_pic.isAvailable();
 }
 
-Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> Camera::getNextFrame()
+// Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> Camera::getNextFrame()
+// {
+//     return m_pic.getNextFrame();
+// }
+
+void *Camera::getFrameRef()
 {
-    return m_pic.getNextFrame();
+    return m_pic.getFrameRef();
+}
+
+uint32_t Camera::getLen()
+{
+    return m_pic.getLen();
+}
+
+void Camera::setProcessed()
+{
+    m_pic.setProcessed();
 }

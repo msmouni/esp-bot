@@ -94,7 +94,13 @@ public:
     esp_err_t init();
 
     bool isPicAvailable();
-    Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> getNextFrame();
+    // Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> getNextFrame();
+
+    void *getFrameRef();
+
+    uint32_t getLen();
+
+    void setProcessed();
 };
 
 // // TODO: Impl class Camera to handle camera (this is done this way just to test)

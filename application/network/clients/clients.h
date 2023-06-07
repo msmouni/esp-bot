@@ -49,6 +49,7 @@ public:
     void update();
     Option<ServerFrame<MaxFrameLen>> getRecvMsg();
     ClientsError sendMsg(ServerFrame<MaxFrameLen>);
+    Result<int, ClientError> sendBytes(void *dataptr, size_t size);
     ClientsError sendStatus(StatusFrameData);
     Option<uint8_t> getClientTakingControl();
 };
@@ -134,6 +135,28 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendMsg(ServerFrame<MaxFram
     {
         return ClientsError::FullTxBuffer;
     }
+}
+
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
+Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendBytes(void *dataptr, size_t size)
+{
+    for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
+    {
+        ClientState client_state = m_clients[client_idx].getState();
+
+        if ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl))
+        {
+            Result<int, ClientError> res = m_clients[client_idx].tryToSendBytes(dataptr, size);
+            if (res.isErr())
+            {
+                deleteClient(client_idx);
+
+                return res;
+            }
+        }
+    }
+
+    return Result<int, ClientError>((int)size);
 }
 
 template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>

@@ -79,12 +79,10 @@ public:
         }
     }
 
-    Result<int, ClientError> tryToSendMsg(ServerFrame<MaxFrameLen> frame)
+    // To avoid Stack overflow: we only pass a pointer + size to the function
+    Result<int, ClientError> tryToSendBytes(void *dataptr, size_t size)
     {
-        frame.toBytes(m_bytes_buffer);
-
-        int r = send(m_socket, m_bytes_buffer, MaxFrameLen, 0);
-        bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
+        int r = send(m_socket, dataptr, size, 0);
 
         if (r == 0)
         {
@@ -95,11 +93,25 @@ public:
         {
             return Result<int, ClientError>(r);
         }
+        else if (errno == SOCKET_ERR_TRY_AGAIN)
+        {
+            return Result<int, ClientError>(0);
+        }
         else
         {
             printf("Client_%d exit with err %d\n", m_id, errno);
             return Result<int, ClientError>(ClientError::SocketError);
         }
+    }
+
+    Result<int, ClientError> tryToSendMsg(ServerFrame<MaxFrameLen> frame)
+    {
+        frame.toBytes(m_bytes_buffer);
+
+        Result<int, ClientError> r = tryToSendBytes(&m_bytes_buffer, MaxFrameLen);
+        bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
+
+        return r;
     }
 
     int getSocketDesc()

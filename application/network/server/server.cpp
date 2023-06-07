@@ -161,6 +161,11 @@ bool TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
     return (m_clients.sendMsg(frame) == ClientsError::None);
 }
 
+Result<int, ClientError> TcpIpServer::tryTosendBytes(void *dataptr, size_t size)
+{
+    return m_clients.sendBytes(dataptr, size);
+}
+
 void TcpIpServer::tryToSendStatus(StatusFrameData status_data)
 {
     m_clients.sendStatus(status_data);

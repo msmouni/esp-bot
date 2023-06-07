@@ -82,6 +82,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
     static void log(const char *debug_msg);
 
     bool tryToSendMsg(ServerFrame<TcpIpServer::MAX_MSG_SIZE>);
+    Result<int, ClientError> tryTosendBytes(void *dataptr, size_t size);
 };
 
 #endif // WIFI_H

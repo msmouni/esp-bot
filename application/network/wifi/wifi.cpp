@@ -323,3 +323,8 @@ bool Wifi::tryToSendMsg(ServerFrame<TcpIpServer::MAX_MSG_SIZE> frame)
 {
     return m_tcp_ip_server.tryToSendMsg(frame);
 }
+
+Result<int, ClientError> Wifi::tryTosendBytes(void *dataptr, size_t size)
+{
+    return m_tcp_ip_server.tryTosendBytes(dataptr, size);
+}
