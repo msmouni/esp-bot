@@ -66,6 +66,8 @@ void MainProgram::run(void)
 {
     while (true)
     {
+        int64_t t_start = esp_timer_get_time();
+
         switch (m_state)
         {
         case MainState::Uninitialized:
@@ -95,6 +97,8 @@ void MainProgram::run(void)
         default:
             break;
         }
+
+        ESP_LOGI(LOG_TAG, "D_t(us)=%lld", esp_timer_get_time() - t_start);
 
         vTaskDelay(pdMS_TO_TICKS(100)); // 100 ms
     }
