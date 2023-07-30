@@ -49,6 +49,9 @@ public:
             return true;
         }
     }
+    // NOTE: A COPY OF T is made here: (In the case of ServerFrame<LEN> ... Stackoverflow)
+    //       if using Refs: Refs must always point to data
+    //       Maybe try to use pointers (store data in buffer, but return only a pointer to data(dangling pointer))
     Option<T> get()
     {
         std::lock_guard<std::mutex> lock(m_mutex);

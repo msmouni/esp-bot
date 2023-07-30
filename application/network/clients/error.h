@@ -12,6 +12,8 @@ const int SOCKET_ERR_TRY_AGAIN = 11;
 enum class ClientError
 {
     NoResponse,
+    NotReady,
+    SocketWouldBlock,
     SocketError,
 };
 

@@ -29,6 +29,7 @@ private:
     static CircularBuffer<StatusFrameData, 10> m_pending_status_data;
 
     SocketsHandler m_socket_handler = SocketsHandler(NB_ALLOWED_CLIENTS);
+    // TcpSocketsHandler m_socket_handler = TcpSocketsHandler(NB_ALLOWED_CLIENTS);
 
     Clients<NB_ALLOWED_CLIENTS, MAX_MSG_SIZE> m_clients = {};
 
@@ -42,9 +43,9 @@ private:
     void tryToConnetClient();
 
     // Message receive of a given size
-    void tryToRecvMsg();
+    void tryToRecvTcpMsg();
 
-    void tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
+    void tryToSendTcpMsg(ServerFrame<MAX_MSG_SIZE>);
     void tryToSendStatus(StatusFrameData);
 
     static void tryToSendMsg_25ms(void *);
@@ -54,6 +55,8 @@ public:
     ~TcpIpServer();
     void start(ApStaSocketsDesc, ServerLogin);
     void stop();
+
+    bool tryToSendUdpMsg(void *, size_t);
 
     ServerError update();
 };
