@@ -332,8 +332,8 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
             m_tmp_frame.setId(ServerFrameId::Status);
             m_tmp_frame.setLen(frame_len);
 
-            // TMP
-            m_tmp_frame.debug();
+            // // TMP
+            // m_tmp_frame.debug();
 
             Result<int, ClientError>
                 res = sendUdpMsg(client_idx, m_tmp_frame.getBufferRef(), MaxFrameLen);

@@ -66,6 +66,8 @@ void MainProgram::run(void)
 {
     while (true)
     {
+        int64_t t_start = esp_timer_get_time();
+
         switch (m_state)
         {
         case MainState::Uninitialized:
@@ -95,6 +97,21 @@ void MainProgram::run(void)
         default:
             break;
         }
+        /*
+        When no client is connected:
+        I (44220) MAIN: D_t(us)=256
+        I (44320) MAIN: D_t(us)=450
+        I (44420) MAIN: D_t(us)=247
+
+        When two client are connected and one auth as super_user:
+        I (40320) MAIN: D_t(us)=3777
+        I (40420) MAIN: D_t(us)=2401
+        I (40520) MAIN: D_t(us)=3963
+        I (40620) MAIN: D_t(us)=4318
+        I (40720) MAIN: D_t(us)=4124
+        I (40820) MAIN: D_t(us)=4082
+        */
+        ESP_LOGI(LOG_TAG, "D_t(us)=%lld", esp_timer_get_time() - t_start);
 
         vTaskDelay(pdMS_TO_TICKS(100)); // 100 ms
     }

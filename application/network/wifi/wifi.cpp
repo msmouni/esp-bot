@@ -73,7 +73,7 @@ void Wifi::configure(WifiSetting &setting) //, IpConfig ip_config)
             esp_restart();
     }*/
 
-    configure_ap(setting.m_ap_setting);
+    // configure_ap(setting.m_ap_setting);
     configure_sta(setting.m_sta_setting);
 }
 Wifi::Wifi(WifiSetting setting, ServerConfig server_config)
@@ -106,15 +106,16 @@ esp_err_t Wifi::init()
         // initialize the esp network interface
         status = esp_netif_init();
 
-        // create wifi access point in the wifi driver
-        m_netiface.m_ap_netif = esp_netif_create_default_wifi_ap();
+        /*// create wifi access point in the wifi driver
+        m_netiface.m_ap_netif = esp_netif_create_default_wifi_ap();*/
 
         // create wifi station in the wifi driver
         m_netiface.m_sta_netif = esp_netif_create_default_wifi_sta();
 
         if (ESP_OK == status)
         {
-            if ((!m_netiface.m_ap_netif) || (!m_netiface.m_sta_netif))
+            if (!m_netiface.m_sta_netif)
+            //((!m_netiface.m_ap_netif) || (!m_netiface.m_sta_netif))
             {
                 status = ESP_FAIL;
             }
@@ -154,16 +155,16 @@ esp_err_t Wifi::init()
         // set the wifi controller to be a station
         if (ESP_OK == status)
         {
-            status = esp_wifi_set_mode(WIFI_MODE_APSTA);
+            status = esp_wifi_set_mode(WIFI_MODE_STA); // APSTA);
         }
 
         // set the wifi AP config
-        if (ESP_OK == status)
+        /*if (ESP_OK == status)
         {
             ESP_LOGI(WIFI_TAG, "AP configuration");
             status = esp_wifi_set_config(WIFI_IF_AP, &m_config.ap_config);
             ESP_LOGI(WIFI_TAG, "AP configured: %d", status);
-        }
+        }*/
 
         // set the wifi STA config
         if (ESP_OK == status)
