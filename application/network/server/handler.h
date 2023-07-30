@@ -41,6 +41,76 @@ enum class SocketError
     ErrorConnectingToClient,
 };
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Inherit From socket: Stream (TCP) | Datagram (UDP)
+class Socket
+{
+protected:
+    const char *M_LOG_TAG;
+
+    int m_socket; // Socket descriptor id
+
+    socklen_t m_socket_addr_len = sizeof(sockaddr_in);
+
+    WhichSocket m_type;
+
+    SocketError m_error;
+    SocketState m_state;
+
+    ServerSocketDesc m_socket_desc;
+
+public:
+    virtual ~Socket() = 0; // Pure virtual destructor
+    void start(ServerSocketDesc);
+
+    void stop();
+
+    virtual SocketError update() = 0;
+
+    SocketState getState();
+};
+
+class TcpSocket : public Socket
+{
+
+    uint8_t m_nb_allowed_clients;
+
+public:
+    TcpSocket(const char *, uint8_t, WhichSocket);
+    ~TcpSocket();
+
+    // void start(ServerSocketDesc);
+    // void stop();
+
+    SocketError update();
+    // SocketState getState();
+    Option<int> tryToConnetClient(sockaddr_in *);
+};
+
+class UdpSocket : public Socket
+{
+
+    SocketState m_state;
+
+    uint8_t m_nb_allowed_clients;
+
+public:
+    UdpSocket(const char *, uint8_t, WhichSocket);
+    ~UdpSocket();
+
+    // void start(ServerSocketDesc);
+    // void stop();
+
+    SocketError update();
+    // SocketState getState();
+    // Option<int> tryToConnetClient(sockaddr_in *);
+};
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/*
 class Socket
 {
     const char *M_LOG_TAG;
@@ -69,8 +139,9 @@ public:
     SocketState getState();
     Option<int> tryToConnetClient(sockaddr_in *);
 };
+*/
 
-enum class ApStaSocketsState
+enum class ApStaTcpSocketsState
 {
     NotStarted,
     InitializingAp,
@@ -79,41 +150,91 @@ enum class ApStaSocketsState
     ListeningOnSta,
     ListeningOnAp,
     ListeningOnApSta,
-    ErrorOnAp,
+    Error,
+};
+
+enum class TcpSocketsHandlerError
+{
+    None,
     ErrorOnSta,
+    ErrorOnAp,
     ErrorOnApSta,
+};
+
+class TcpSocketsHandler
+{
+    const char *M_LOG_TAG = "TcpSocketsHandler";
+
+    TcpSocket *m_ap_socket;
+    TcpSocket *m_sta_socket;
+
+    ApStaTcpSocketsState m_state;
+    TcpSocketsHandlerError m_error;
+
+    uint8_t m_nb_allowed_clients;
+
+public:
+    TcpSocketsHandler(uint8_t);
+    ~TcpSocketsHandler();
+
+    void start(ApStaSocketsDesc);
+    void stop();
+
+    TcpSocketsHandlerError update();
+    ApStaTcpSocketsState getState();
+    bool isListening();
+    Option<int> tryToConnetClient(sockaddr_in *);
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum class SocketsState
+{
+    NotStarted,
+    Initializing,
+    RunningTcpOnAp,
+    RunningTcpOnSta,
+    RunningTcpOnApSta,
+    RunningUdpOnAp,
+    RunningUdpOnSta,
+    RunningUdpOnApSta,
+    RunningTcpUdpOnAp,
+    RunningTcpUdpOnSta,
+    RunningTcpUdpOnApSta,
+    Error,
 };
 
 enum class SocketsHandlerError
 {
     None,
-    ErrorOnSta,
-    ErrorOnAp,
-    ErrorOnApSta
+    Error,
+    // TcpErrorOnSta,
+    // TcpErrorOnAp,
+    // TcpErrorOnApSta,
+    // UdpErrorOnSta,
+    // UdpErrorOnAp,
+    // UdpErrorOnApSta,
+    // GlErrorOnSta,
+    // GlErrorOnAp,
+    // GlErrorOnApSta,
 };
 
 class SocketsHandler
 {
-    const char *M_LOG_TAG = "SocketsHandler";
+    TcpSocketsHandler *m_tcp_handler;
 
-    Socket *m_ap_socket;
-    Socket *m_sta_socket;
-
-    ApStaSocketsState m_state;
-    SocketsHandlerError m_error;
-
-    uint8_t m_nb_allowed_clients;
+    SocketsState m_state;
 
 public:
     SocketsHandler(uint8_t);
-    ~SocketsHandler();
+    ~SocketsHandler() = default;
 
     void start(ApStaSocketsDesc);
     void stop();
 
     SocketsHandlerError update();
-    ApStaSocketsState getState();
-    bool isListening();
+    SocketsState getState();
+    bool isReady();
     Option<int> tryToConnetClient(sockaddr_in *);
 };
 

@@ -30,6 +30,7 @@ private:
     static const uint8_t TxBufferSize = 50;
     CircularBuffer<ServerFrame<MaxFrameLen>, TxBufferSize> tx_frames_buffer; // To all authentified clients
     CircularBuffer<StatusFrameData, 10> m_status_data_to_send;
+    ServerFrame<MaxFrameLen> m_tmp_frame;
 
     Option<struct sockaddr_in *> getClientAddr(uint8_t);
     void deleteClient(uint8_t);
@@ -173,13 +174,19 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                 status_frame.m_auth_type = AuthentificationType::AsSuperClient;
             }
 
-            char bytes[MaxFrameLen - 5];
+            // char bytes[MaxFrameLen - 5];
 
-            uint8_t frame_len = status_frame.toBytes(bytes);
+            m_tmp_frame.clear();
 
-            ServerFrame<MaxFrameLen> frame = ServerFrame<MaxFrameLen>(ServerFrameId::Status, frame_len, bytes);
+            uint8_t frame_len = status_frame.toBytes((char *)m_tmp_frame.getDataPtr()); // bytes);
 
-            Result<int, ClientError> res = m_clients[client_idx].tryToSendMsg(frame);
+            // ServerFrame<MaxFrameLen> frame = ServerFrame<MaxFrameLen>(ServerFrameId::Status, frame_len, &bytes);
+
+            m_tmp_frame.setId(ServerFrameId::Status);
+            m_tmp_frame.setLen(frame_len);
+
+            Result<int, ClientError>
+                res = m_clients[client_idx].tryToSendMsg(m_tmp_frame);
             if (res
                     .isErr())
             {
@@ -232,7 +239,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                             ServerLogin &server_login = m_server_login.getData();
 
                             // TO VERIFY: reinterpret_cast
-                            char *msg_data = reinterpret_cast<char *>(msg.getData());
+                            char *msg_data = reinterpret_cast<char *>(msg.getDataPtr());
 
                             AuthFrameData auth_data = AuthFrameData(msg_data);
 
@@ -280,7 +287,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                     if (msg.getId() == ServerFrameId::Authentification)
                     {
                         // TO VERIFY: reinterpret_cast
-                        char *msg_data = reinterpret_cast<char *>(msg.getData());
+                        char *msg_data = reinterpret_cast<char *>(msg.getDataPtr());
 
                         AuthFrameData auth_data = AuthFrameData(msg_data);
 
@@ -298,7 +305,7 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
                     if (msg.getId() == ServerFrameId::Authentification)
                     {
                         // TO VERIFY: reinterpret_cast
-                        char *msg_data = reinterpret_cast<char *>(msg.getData());
+                        char *msg_data = reinterpret_cast<char *>(msg.getDataPtr());
 
                         AuthFrameData auth_data = AuthFrameData(msg_data);
 

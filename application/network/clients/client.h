@@ -79,12 +79,13 @@ public:
         }
     }
 
-    Result<int, ClientError> tryToSendMsg(ServerFrame<MaxFrameLen> frame)
+    Result<int, ClientError> tryToSendMsg(ServerFrame<MaxFrameLen> &frame)
     {
-        frame.toBytes(m_bytes_buffer);
+        // frame.toBytes(m_bytes_buffer);
 
-        int r = send(m_socket, m_bytes_buffer, MaxFrameLen, 0);
-        bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
+        int r = send(m_socket, frame.getBufferRef(), MaxFrameLen, 0);
+        // bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
+        // frame.clear();
 
         if (r == 0)
         {

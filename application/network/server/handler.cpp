@@ -11,20 +11,6 @@ void setSocketNonBlocking(int socket_desc)
     fcntl(socket_desc, F_SETFL, flags);
 }
 
-Socket::Socket(const char *log, uint8_t nb_allowed_clients, WhichSocket s_type)
-{
-    M_LOG_TAG = log;
-    m_type = s_type;
-    m_nb_allowed_clients = nb_allowed_clients;
-    m_state = SocketState::NotStarted;
-    m_error = SocketError::None;
-}
-
-Socket::~Socket()
-{
-    close(m_socket);
-}
-
 void Socket::start(ServerSocketDesc socket_desc)
 {
     m_socket_desc = socket_desc;
@@ -43,7 +29,46 @@ void Socket::stop()
     m_error = SocketError::None;
 }
 
-SocketError Socket::update()
+SocketState Socket::getState()
+{
+    return m_state;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+TcpSocket::TcpSocket(const char *log, uint8_t nb_allowed_clients, WhichSocket s_type)
+{
+    M_LOG_TAG = log;
+    m_type = s_type;
+    m_nb_allowed_clients = nb_allowed_clients;
+    m_state = SocketState::NotStarted;
+    m_error = SocketError::None;
+}
+
+TcpSocket::~TcpSocket()
+{
+    close(m_socket);
+}
+
+// void TcpSocket::start(ServerSocketDesc socket_desc)
+// {
+//     m_socket_desc = socket_desc;
+//     m_state = SocketState::Uninitialized;
+// }
+
+// void TcpSocket::stop()
+// {
+//     if ((m_state != SocketState::NotStarted) & (m_state != SocketState::Uninitialized))
+//     {
+//         // According to manual: Upon successful completion, 0 shall be returned; otherwise, -1 shall be returned and errno set to indicate the error.
+//         close(m_socket);
+//     }
+
+//     m_state = SocketState::NotStarted;
+//     m_error = SocketError::None;
+// }
+
+SocketError TcpSocket::update()
 {
     switch (m_state)
     {
@@ -106,12 +131,12 @@ SocketError Socket::update()
     return SocketError::None;
 }
 
-SocketState Socket::getState()
-{
-    return m_state;
-}
+// SocketState TcpSocket::getState()
+// {
+//     return m_state;
+// }
 
-Option<int> Socket::tryToConnetClient(sockaddr_in *next_client_addr)
+Option<int> TcpSocket::tryToConnetClient(sockaddr_in *next_client_addr)
 {
     /*
     On success, these system calls return a file descriptor for the
@@ -133,20 +158,83 @@ Option<int> Socket::tryToConnetClient(sockaddr_in *next_client_addr)
     return Option<int>();
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+UdpSocket::UdpSocket(const char *log, uint8_t nb_allowed_clients, WhichSocket s_type)
+{
+    M_LOG_TAG = log;
+    m_type = s_type;
+    m_nb_allowed_clients = nb_allowed_clients;
+    m_state = SocketState::NotStarted;
+    m_error = SocketError::None;
+}
+
+UdpSocket::~UdpSocket()
+{
+    close(m_socket);
+}
+
+SocketError UdpSocket::update()
+{
+    switch (m_state)
+    {
+    case SocketState::Uninitialized:
+    {
+        m_socket = socket(AF_INET, SOCK_DGRAM, 0);
+
+        if (m_socket < 0)
+        {
+            ESP_LOGE(M_LOG_TAG, "Failed to create socket: %d", (uint8_t)m_type);
+            m_error = SocketError::CannotCreate;
+            m_state = SocketState::Error;
+            return SocketError::CannotCreate;
+        }
+
+        setSocketNonBlocking(m_socket);
+
+        ESP_LOGI(M_LOG_TAG, "Socket_%d Created", (uint8_t)m_type);
+
+        m_state = SocketState::Created;
+
+        break;
+    }
+    case SocketState::Created:
+    {
+        if (bind(m_socket, (struct sockaddr *)&m_socket_desc.addr, m_socket_addr_len) < 0)
+        {
+            ESP_LOGE(M_LOG_TAG, "Failed to bind socket_%d", (uint8_t)m_type);
+            m_error = SocketError::CannotBind;
+            m_state = SocketState::Error;
+            return SocketError::CannotBind;
+        }
+
+        m_state = SocketState::Bound;
+
+        break;
+    }
+    default:
+    {
+        break;
+    }
+    }
+
+    return SocketError::None;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////
 
-SocketsHandler::SocketsHandler(uint8_t nb_allowed_clients)
+TcpSocketsHandler::TcpSocketsHandler(uint8_t nb_allowed_clients)
 {
-    m_ap_socket = new Socket(M_LOG_TAG, nb_allowed_clients, WhichSocket::Ap);
-    m_sta_socket = new Socket(M_LOG_TAG, nb_allowed_clients, WhichSocket::Sta);
+    m_ap_socket = new TcpSocket(M_LOG_TAG, nb_allowed_clients, WhichSocket::Ap);
+    m_sta_socket = new TcpSocket(M_LOG_TAG, nb_allowed_clients, WhichSocket::Sta);
 
-    m_state = ApStaSocketsState::NotStarted;
-    m_error = SocketsHandlerError::None;
+    m_state = ApStaTcpSocketsState::NotStarted;
+    m_error = TcpSocketsHandlerError::None;
 
     m_nb_allowed_clients = nb_allowed_clients;
 }
 
-SocketsHandler::~SocketsHandler()
+TcpSocketsHandler::~TcpSocketsHandler()
 {
     m_ap_socket->stop();
     m_sta_socket->stop();
@@ -155,7 +243,7 @@ SocketsHandler::~SocketsHandler()
     delete m_sta_socket;
 }
 
-void SocketsHandler::start(ApStaSocketsDesc sockets_desc)
+void TcpSocketsHandler::start(ApStaSocketsDesc sockets_desc)
 {
     bool has_ap_sock = sockets_desc.m_ap_socket_desc.isSome();
     bool has_sta_sock = sockets_desc.m_sta_socket_desc.isSome();
@@ -164,100 +252,101 @@ void SocketsHandler::start(ApStaSocketsDesc sockets_desc)
     {
         m_ap_socket->start(sockets_desc.m_ap_socket_desc.getData());
         m_sta_socket->start(sockets_desc.m_sta_socket_desc.getData());
-        m_state = ApStaSocketsState::InitializingApSta;
+        m_state = ApStaTcpSocketsState::InitializingApSta;
     }
     else if (has_ap_sock)
     {
         m_ap_socket->start(sockets_desc.m_ap_socket_desc.getData());
-        m_state = ApStaSocketsState::InitializingAp;
+        m_state = ApStaTcpSocketsState::InitializingAp;
     }
     else if (has_sta_sock)
     {
         m_sta_socket->start(sockets_desc.m_sta_socket_desc.getData());
-        m_state = ApStaSocketsState::InitializingSta;
+        m_state = ApStaTcpSocketsState::InitializingSta;
     }
     else
     {
-        m_state = ApStaSocketsState::ErrorOnApSta;
+        m_state = ApStaTcpSocketsState::Error;
+        m_error = TcpSocketsHandlerError::ErrorOnApSta;
     }
 }
 
-void SocketsHandler::stop()
+void TcpSocketsHandler::stop()
 {
     m_ap_socket->stop();
     m_sta_socket->stop();
 
-    m_state = ApStaSocketsState::NotStarted;
-    m_error = SocketsHandlerError::None;
+    m_state = ApStaTcpSocketsState::NotStarted;
+    m_error = TcpSocketsHandlerError::None;
 }
 
-SocketsHandlerError SocketsHandler::update()
+TcpSocketsHandlerError TcpSocketsHandler::update()
 {
     switch (m_state)
     {
-    case ApStaSocketsState::InitializingApSta:
+    case ApStaTcpSocketsState::InitializingApSta:
     {
         SocketError res_ap = m_ap_socket->update();
         SocketError res_sta = m_sta_socket->update();
 
-        if ((res_ap != SocketError::None) || (res_sta != SocketError::None))
+        if ((res_ap != SocketError::None) && (res_sta != SocketError::None))
         {
-            m_state = ApStaSocketsState::ErrorOnApSta;
-            return SocketsHandlerError::ErrorOnApSta;
+            m_state = ApStaTcpSocketsState::Error;
+            return TcpSocketsHandlerError::ErrorOnApSta;
         }
         else if (res_ap != SocketError::None)
         {
             if (m_sta_socket->getState() == SocketState::Listening)
             {
-                m_state = ApStaSocketsState::ListeningOnSta;
+                m_state = ApStaTcpSocketsState::ListeningOnSta;
             }
-            return SocketsHandlerError::ErrorOnAp;
+            return TcpSocketsHandlerError::ErrorOnAp;
         }
         else if (res_sta != SocketError::None)
         {
             if (m_ap_socket->getState() == SocketState::Listening)
             {
-                m_state = ApStaSocketsState::ListeningOnAp;
+                m_state = ApStaTcpSocketsState::ListeningOnAp;
             }
-            return SocketsHandlerError::ErrorOnSta;
+            return TcpSocketsHandlerError::ErrorOnSta;
         }
         else if ((m_ap_socket->getState() == SocketState::Listening) && (m_sta_socket->getState() == SocketState::Listening))
         {
-            m_state = ApStaSocketsState::ListeningOnApSta;
+            m_state = ApStaTcpSocketsState::ListeningOnApSta;
         }
 
         break;
     }
-    case ApStaSocketsState::InitializingAp:
+    case ApStaTcpSocketsState::InitializingAp:
     {
         SocketError res_ap = m_ap_socket->update();
 
         if (res_ap != SocketError::None)
         {
-            m_state = ApStaSocketsState::ErrorOnAp;
+            m_state = ApStaTcpSocketsState::Error;
 
-            return SocketsHandlerError::ErrorOnApSta;
+            return TcpSocketsHandlerError::ErrorOnAp;
         }
         else if (m_ap_socket->getState() == SocketState::Listening)
         {
-            m_state = ApStaSocketsState::ListeningOnAp;
+            m_state = ApStaTcpSocketsState::ListeningOnAp;
         }
 
         break;
     }
-    case ApStaSocketsState::InitializingSta:
+    case ApStaTcpSocketsState::InitializingSta:
     {
         SocketError res_sta = m_sta_socket->update();
 
         if (res_sta != SocketError::None)
         {
-            m_state = ApStaSocketsState::ErrorOnSta;
+            m_state = ApStaTcpSocketsState::Error;
 
-            return SocketsHandlerError::ErrorOnApSta;
+            return TcpSocketsHandlerError::ErrorOnSta;
         }
         else if (m_sta_socket->getState() == SocketState::Listening)
         {
-            m_state = ApStaSocketsState::ListeningOnSta;
+            m_state = ApStaTcpSocketsState::ListeningOnSta;
         }
 
         break;
@@ -268,20 +357,20 @@ SocketsHandlerError SocketsHandler::update()
     }
     }
 
-    return SocketsHandlerError::None;
+    return TcpSocketsHandlerError::None;
 }
 
-ApStaSocketsState SocketsHandler::getState()
+ApStaTcpSocketsState TcpSocketsHandler::getState()
 {
     return m_state;
 }
 
-bool SocketsHandler::isListening()
+bool TcpSocketsHandler::isListening()
 {
-    return (m_state == ApStaSocketsState::ListeningOnApSta) || (m_state == ApStaSocketsState::ListeningOnAp) || (m_state == ApStaSocketsState::ListeningOnSta);
+    return (m_state == ApStaTcpSocketsState::ListeningOnApSta) || (m_state == ApStaTcpSocketsState::ListeningOnAp) || (m_state == ApStaTcpSocketsState::ListeningOnSta);
 }
 
-Option<int> SocketsHandler::tryToConnetClient(sockaddr_in *next_client_addr)
+Option<int> TcpSocketsHandler::tryToConnetClient(sockaddr_in *next_client_addr)
 {
     // Prioritizing AP over STA
     Option<int> res_ap = m_ap_socket->tryToConnetClient(next_client_addr);
@@ -302,3 +391,51 @@ Option<int> SocketsHandler::tryToConnetClient(sockaddr_in *next_client_addr)
 
     return Option<int>();
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+SocketsHandler::SocketsHandler(uint8_t nb_allowed_clients)
+{
+    m_tcp_handler = new TcpSocketsHandler(nb_allowed_clients);
+
+    m_state = SocketsState::NotStarted;
+}
+
+void SocketsHandler::start(ApStaSocketsDesc sockets_desc)
+{
+    m_tcp_handler->start(sockets_desc);
+}
+
+void SocketsHandler::stop()
+{
+    m_tcp_handler->stop();
+}
+
+SocketsState SocketsHandler::getState()
+{
+    return m_state;
+}
+bool SocketsHandler::isReady()
+{
+    return (m_state == SocketsState::RunningTcpOnAp) ||
+           (m_state == SocketsState::RunningTcpOnSta) ||
+           (m_state == SocketsState::RunningTcpOnApSta) ||
+           (m_state == SocketsState::RunningUdpOnAp) ||
+           (m_state == SocketsState::RunningUdpOnSta) ||
+           (m_state == SocketsState::RunningUdpOnApSta) ||
+           (m_state == SocketsState::RunningTcpUdpOnAp) ||
+           (m_state == SocketsState::RunningTcpUdpOnSta) ||
+           (m_state == SocketsState::RunningTcpUdpOnApSta);
+}
+Option<int> SocketsHandler::tryToConnetClient(sockaddr_in *next_client_addr)
+{
+    return m_tcp_handler->tryToConnetClient(next_client_addr);
+}
+// ~SocketsHandler() = default;
+
+// void start(ApStaSocketsDesc);
+// void stop();
+
+// SocketsHandlerError update();
+// SocketsState getState();
+// bool isListening();
+// Option<int> tryToConnetClient(sockaddr_in *);
