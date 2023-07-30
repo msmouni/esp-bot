@@ -41,6 +41,7 @@ enum class SocketError
     ErrorConnectingToClient,
 };
 
+// Inherit From socket: Stream (TCP) | Datagram (UDP)
 class Socket
 {
     const char *M_LOG_TAG;

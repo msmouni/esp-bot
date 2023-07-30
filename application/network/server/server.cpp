@@ -137,15 +137,17 @@ void TcpIpServer::tryToRecvMsg()
     if (opt_msg.isSome())
     {
         // TMP
-        uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
+        // uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
 
         ServerFrame<MAX_MSG_SIZE> msg = opt_msg.getData();
 
+        ESP_LOGI(SERVER_TAG, "Client_%d:", m_clients.getClientTakingControl().getData());
+
         msg.debug();
 
-        msg.toBytes(m_recv_buffer);
+        // msg.toBytes(m_recv_buffer);
 
-        ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
+        // ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
     }
 }
 
