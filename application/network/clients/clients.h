@@ -34,9 +34,12 @@ private:
     CircularBuffer<ServerFrame<MaxFrameLen>, TxBufferSize> tx_frames_buffer; // To all authentified clients
     CircularBuffer<StatusFrameData, 10> m_status_data_to_send;
     ServerFrame<MaxFrameLen> m_tmp_frame;
+    Option<int> m_ap_udpfd = Option<int>();
+    Option<int> m_sta_udpfd = Option<int>();
 
     Option<struct sockaddr_in *> getClientAddr(uint8_t);
     void deleteClient(uint8_t);
+    Result<int, ClientError> sendUdpMsg(int, void *, size_t);
 
 public:
     Clients() : m_nb_connected_clients(0), m_client_id_tracker(0)
@@ -54,7 +57,11 @@ public:
     Option<ServerFrame<MaxFrameLen>> getRecvTcpMsg();
     ClientsError sendTcpMsg(ServerFrame<MaxFrameLen>);
     ClientsError sendStatus(StatusFrameData);
-    Result<int, ClientError> sendUdpMsg(Option<int>, Option<int>, void *, size_t);
+    void setApUdpFd(Option<int>);
+    bool hasApUdpFd();
+    void setStaUdpFd(Option<int>);
+    bool hasStaUdpFd();
+    Result<int, ClientError> sendUdpMsgToAll(void *, size_t);
     Option<uint8_t> getClientTakingControl();
 };
 
@@ -142,6 +149,30 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendTcpMsg(ServerFrame<MaxF
 }
 
 template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+void Clients<NbAllowedClients, MaxFrameLen>::setApUdpFd(Option<int> ap_udp_fd)
+{
+    m_ap_udpfd = ap_udp_fd;
+}
+
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+bool Clients<NbAllowedClients, MaxFrameLen>::hasApUdpFd()
+{
+    return m_ap_udpfd.isSome();
+}
+
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+void Clients<NbAllowedClients, MaxFrameLen>::setStaUdpFd(Option<int> sta_udp_fd)
+{
+    m_sta_udpfd = sta_udp_fd;
+}
+
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+bool Clients<NbAllowedClients, MaxFrameLen>::hasStaUdpFd()
+{
+    return m_sta_udpfd.isSome();
+}
+
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
 ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendStatus(StatusFrameData status_data)
 {
     if (m_status_data_to_send.push(status_data))
@@ -154,9 +185,64 @@ ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendStatus(StatusFrameData 
     }
 }
 
-/// sendUdpMsg(Option<int> ap_udpfd, Option<int> sta_udpfd, void *msg_ptr, size_t size)
+/// sendUdpMsg(int client_idx,Option<int> ap_udpfd, Option<int> sta_udpfd, void *msg_ptr, size_t size)
 template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
-Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsg(Option<int> ap_udpfd, Option<int> sta_udpfd, void *msg_ptr, size_t size)
+Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsg(int client_idx, void *msg_ptr, size_t size)
+{
+
+    ClientState client_state = m_clients[client_idx].getState();
+
+    if ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl))
+    {
+        sockaddr_in *client_addr = m_clients[client_idx].getAddrPtr();
+        WhichSocket &connected_to = m_clients[client_idx].getSocketConnectedTo();
+
+        int r = 0;
+
+        if (m_ap_udpfd.isSome() && connected_to == WhichSocket::Ap)
+        {
+            r = sendto(m_ap_udpfd.getData(), msg_ptr, size, 0,
+                       (struct sockaddr *)client_addr, sizeof(*client_addr)); // Todo: Check if r == size
+        }
+        else if (m_sta_udpfd.isSome() && connected_to == WhichSocket::Sta)
+        {
+            r = sendto(m_sta_udpfd.getData(), msg_ptr, size, 0,
+                       (struct sockaddr *)client_addr, sizeof(*client_addr)); // Todo: Check if r == size
+        }
+        else
+        {
+            printf("Client: Error sending 1");
+            return Result<int, ClientError>(ClientError::NotReady);
+        }
+
+        if (r < 0)
+        {
+            if (errno == SOCKET_ERR_TRY_AGAIN)
+            {
+                printf("Client_%d: Error sending Udp: %d\n", m_clients[client_idx].getId(), errno);
+                return Result<int, ClientError>(ClientError::SocketWouldBlock);
+            }
+            else
+            {
+                printf("Client_%d: Error sending Udp: %d\n", m_clients[client_idx].getId(), errno);
+                return Result<int, ClientError>(ClientError::SocketError);
+            }
+        }
+        else
+        {
+            return Result<int, ClientError>(r);
+        }
+    }
+    else
+    {
+        printf("Client: Error sending 2");
+        return Result<int, ClientError>(ClientError::NotReady);
+    }
+}
+
+/// sendUdpMsgToAll(Option<int> ap_udpfd, Option<int> sta_udpfd, void *msg_ptr, size_t size)
+template <uint8_t NbAllowedClients, uint8_t MaxFrameLen>
+Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsgToAll(void *msg_ptr, size_t size)
 {
     if (m_nb_connected_clients == 0)
     {
@@ -166,7 +252,9 @@ Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsg(Opti
     {
         for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
         {
-            ClientState client_state = m_clients[client_idx].getState();
+            sendUdpMsg(client_idx, msg_ptr, size);
+
+            /*ClientState client_state = m_clients[client_idx].getState();
 
             if ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl))
             {
@@ -202,7 +290,7 @@ Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsg(Opti
                         return Result<int, ClientError>(ClientError::SocketError);
                     }
                 }
-            }
+            }*/
         }
 
         return Result<int, ClientError>(size);
@@ -244,13 +332,30 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
             m_tmp_frame.setId(ServerFrameId::Status);
             m_tmp_frame.setLen(frame_len);
 
+            // TMP
+            m_tmp_frame.debug();
+
             Result<int, ClientError>
-                res = m_clients[client_idx].tryToSendTcpMsg(m_tmp_frame);
+                res = sendUdpMsg(client_idx, m_tmp_frame.getBufferRef(), MaxFrameLen);
             if (res
                     .isErr())
             {
-                deleteClient(client_idx);
-                return; // TODO: continue for others
+                ClientError err = res.getErr();
+
+                switch (err)
+                {
+                case ClientError::NotReady:
+                    deleteClient(client_idx);
+                    break;
+                case ClientError::SocketError:
+                    deleteClient(client_idx);
+                    break;
+
+                default:
+                    break;
+                }
+
+                // return; // TODO: continue for others
             }
         }
 
@@ -282,6 +387,8 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
             {
 
                 ServerFrame<MaxFrameLen> msg = opt_msg.getData();
+
+                // msg.debug(); //////////////////////////////////////   TMP
 
                 switch (client_state)
                 {

@@ -22,7 +22,9 @@ TcpIpServer::~TcpIpServer()
 void TcpIpServer::start(ApStaSocketsDesc sockets_desc, ServerLogin login)
 {
     m_socket_handler.start(sockets_desc);
+
     m_clients.setServerLogin(login);
+
     m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg_25ms, NULL, 25000);
     m_state = ServerState::Uninitialized;
 }
@@ -82,6 +84,17 @@ ServerError TcpIpServer::update()
     }
     case ServerState::Running:
     {
+        if (m_socket_handler.isReady())
+        {
+            if (!m_clients.hasApUdpFd())
+            {
+                m_clients.setApUdpFd(m_socket_handler.getApUdpFd());
+            }
+            if (!m_clients.hasStaUdpFd())
+            {
+                m_clients.setStaUdpFd(m_socket_handler.getStaUdpFd());
+            }
+        }
 
         tryToConnetClient();
 
@@ -164,5 +177,5 @@ void TcpIpServer::tryToSendStatus(StatusFrameData status_data)
 bool TcpIpServer::tryToSendUdpMsg(void *data_ptr, size_t data_size)
 {
 
-    return m_clients.sendUdpMsg(m_socket_handler.getApUdpFd(), m_socket_handler.getStaUdpFd(), data_ptr, data_size).isOk();
+    return m_clients.sendUdpMsgToAll(data_ptr, data_size).isOk();
 }

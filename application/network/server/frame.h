@@ -134,7 +134,7 @@ public:
     uint8_t *getDataPtr()
     {
         // return m_data;
-        return m_buffer + FRAME_HEADER_LEN; // to test
+        return m_buffer + FRAME_HEADER_LEN;
     }
 
     uint8_t (&getBufferRef())[MaxFrameLen]
