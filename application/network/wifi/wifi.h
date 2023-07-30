@@ -79,6 +79,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
 
     WifiResult update(void);
     WifiState getState(void);
+    bool tryToSendUdpMsg(void *data_ptr, size_t data_size);
     static void log(const char *debug_msg);
 };
 

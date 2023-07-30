@@ -54,14 +54,14 @@ ServerError TcpIpServer::update()
             m_state = ServerState::Error;
             return ServerError::SocketError;
         }
-        else if (m_socket_handler.isListening())
+        else if (m_socket_handler.isReady())
         {
-            m_state = ServerState::SocketsListening;
+            m_state = ServerState::SocketsReady;
         }
 
         break;
     }
-    case ServerState::SocketsListening:
+    case ServerState::SocketsReady:
     {
         esp_err_t res_strt = m_timer_send_25ms->start();
         if (res_strt != ESP_OK)
@@ -92,7 +92,7 @@ ServerError TcpIpServer::update()
 
         m_clients.update();
 
-        tryToRecvMsg();
+        tryToRecvTcpMsg();
 
         break;
     }
@@ -116,7 +116,7 @@ void TcpIpServer::tryToConnetClient()
 
         sockaddr_in *next_client_addr = opt_next_client_addr.getData();
 
-        Option<int> res_connect_client = m_socket_handler.tryToConnetClient(next_client_addr);
+        Option<ConnectedClient> res_connect_client = m_socket_handler.tryToConnetClient(next_client_addr);
 
         if (res_connect_client
                 .isSome())
@@ -129,32 +129,40 @@ void TcpIpServer::tryToConnetClient()
 }
 
 // TODO: STORE MSGs IN BUFFER
-void TcpIpServer::tryToRecvMsg()
+void TcpIpServer::tryToRecvTcpMsg()
 {
     // TMP
-    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvMsg();
+    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvTcpMsg();
 
     if (opt_msg.isSome())
     {
         // TMP
-        uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
+        // uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
 
         ServerFrame<MAX_MSG_SIZE> msg = opt_msg.getData();
 
+        ESP_LOGI(SERVER_TAG, "Client_%d:", m_clients.getClientTakingControl().getData());
+
         msg.debug();
 
-        msg.toBytes(m_recv_buffer);
+        // msg.toBytes(m_recv_buffer);
 
-        ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
+        // ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
     }
 }
 
-void TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
+void TcpIpServer::tryToSendTcpMsg(ServerFrame<MAX_MSG_SIZE> frame)
 {
-    m_clients.sendMsg(frame);
+    m_clients.sendTcpMsg(frame);
 }
 
 void TcpIpServer::tryToSendStatus(StatusFrameData status_data)
 {
     m_clients.sendStatus(status_data);
+}
+
+bool TcpIpServer::tryToSendUdpMsg(void *data_ptr, size_t data_size)
+{
+
+    return m_clients.sendUdpMsg(m_socket_handler.getApUdpFd(), m_socket_handler.getStaUdpFd(), data_ptr, data_size).isOk();
 }
