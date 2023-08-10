@@ -96,11 +96,11 @@ public:
     bool isPicAvailable();
     // Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> getNextFrame();
 
-    void *getFrameRef();
+    Option<void *> getNextFrameBuff();
 
     uint32_t getLen();
 
-    void setProcessed();
+    // void setProcessed();
 };
 
 // // TODO: Impl class Camera to handle camera (this is done this way just to test)

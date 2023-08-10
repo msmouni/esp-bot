@@ -88,9 +88,9 @@ bool Camera::isPicAvailable()
 //     return m_pic.getNextFrame();
 // }
 
-void *Camera::getFrameRef()
+Option<void *> Camera::getNextFrameBuff()
 {
-    return m_pic.getFrameRef();
+    return m_pic.getNextFrameBuff();
 }
 
 uint32_t Camera::getLen()
@@ -98,7 +98,7 @@ uint32_t Camera::getLen()
     return m_pic.getLen();
 }
 
-void Camera::setProcessed()
-{
-    m_pic.setProcessed();
-}
+// void Camera::setProcessed()
+// {
+//     m_pic.setProcessed();
+// }

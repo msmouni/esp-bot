@@ -20,8 +20,8 @@
 class TcpIpServer
 {
 public:
-    static const int NB_ALLOWED_CLIENTS = 5;  // number of allowed clients
-    static const uint16_t MAX_MSG_SIZE = 128; // 1024; // 8192; // 128; // To adjust later reg Msgs to send
+    static const int NB_ALLOWED_CLIENTS = 5; // number of allowed clients
+    static const uint8_t MAX_MSG_SIZE = 128; // 1024; // 8192; // 128; // To adjust later reg Msgs to send
 private:
     // Debug Tag
     constexpr static const char *SERVER_TAG = "SERVER";

@@ -159,15 +159,30 @@ void MainProgram::update()
 
         if (m_camera.isPicAvailable())
         {
+            bool done_sending = false;
+
+            while (!done_sending)
+            {
+                Option<void *> pic_frame_buff = m_camera.getNextFrameBuff();
+
+                if (pic_frame_buff.isNone())
+                {
+                    done_sending = true;
+                }
+                else
+                {
+                    m_wifi->tryToSendUdpMsg(pic_frame_buff.getData(), TcpIpServer::MAX_MSG_SIZE); // TMP:len
+                }
+            }
             // void *ptr = m_camera.getFrameRef();
             // uint32_t len = m_camera.getLen();
             // TODO: check if Clients Ready ...
-            Result<int, ClientError> send_res = m_wifi->tryToSendUdpMsg(m_camera.getFrameRef(), m_camera.getLen());
+            // Result<int, ClientError> send_res = m_wifi->tryToSendUdpMsg(m_camera.getFrameRef(), m_camera.getLen());
 
-            if (send_res.isOk())
-            {
-                m_camera.setProcessed();
-            }
+            // if (send_res.isOk())
+            // {
+            //     m_camera.setProcessed();
+            // }
         }
 
         /*if (m_camera

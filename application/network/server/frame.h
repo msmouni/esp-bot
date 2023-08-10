@@ -6,22 +6,22 @@
 #include <stdint.h>
 #include <algorithm>
 
-// ServerFrame as uint16_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH[2], uint8_t DATA[DATA_LEN]]
+// ServerFrame as uint16_t frame[Length]: uint8_t ID, uint8_t FRAME_LENGTH, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
 // Frame definition
-const uint32_t FRAME_ID_OFFSET = 0;
-const uint32_t FRAME_LEN_OFFSET = 4;
-const uint32_t FRAME_HEADER_LEN = 6;
-const uint32_t FRAME_DATA_OFFSET = FRAME_HEADER_LEN;
+const uint8_t FRAME_ID_OFFSET = 0;
+const uint8_t FRAME_LEN_OFFSET = 1;
+const uint8_t FRAME_HEADER_LEN = 3;
+const uint8_t FRAME_DATA_OFFSET = FRAME_HEADER_LEN;
 
 // To Maybe adjust later : 32bits ...
-enum class ServerFrameId : uint32_t
+enum class ServerFrameId : uint8_t
 {
     NotDefined = 0x00,
     Authentification = 0x01,
     Status = 0x02,
     CamPic = 0x03,
     Debug = 0xFF,
-    Unknown = UINT32_MAX,
+    Unknown = UINT8_MAX,
 };
 
 /*
@@ -44,8 +44,8 @@ int r = read(socket, frame.getBufferRef(), MaxFrameLen);
 
 */
 
-// ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t DATA[DATA_LEN]]
-template <uint16_t MaxFrameLen>
+// ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
+template <uint8_t MaxFrameLen>
 class ServerFrame
 {
 private:
@@ -115,40 +115,50 @@ public:
 
     void setId(ServerFrameId id)
     {
-        uint32_t id_uint32 = static_cast<uint32_t>(id);
+        // uint32_t id_uint32 = static_cast<uint32_t>(id);
+        // // Endianness ...
+        // m_buffer[0] = static_cast<uint8_t>(id_uint32 >> 24);
+        // m_buffer[1] = static_cast<uint8_t>(id_uint32 >> 16);
+        // m_buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
+        // m_buffer[3] = static_cast<uint8_t>(id_uint32);
+        m_buffer[0] = static_cast<uint8_t>(id);
+    }
+
+    void setLen(uint8_t len)
+    {
+        m_buffer[1] = len;
+    }
+
+    void setNumber(uint8_t number)
+    {
+        m_buffer[2] = number;
+    }
+
+    static void setHeader(ServerFrameId id, uint8_t len, uint8_t number)
+    {
+
+        setId(id);
+        setLen(len);
+        setNumber(number);
+
+        // uint8_t[SERVER_FRAME_HEADER_SIZE] buffer;
+
+        /*uint32_t id_uint32 = static_cast<uint32_t>(id);
         // Endianness ...
         m_buffer[0] = static_cast<uint8_t>(id_uint32 >> 24);
         m_buffer[1] = static_cast<uint8_t>(id_uint32 >> 16);
         m_buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
         m_buffer[3] = static_cast<uint8_t>(id_uint32);
-    }
 
-    void setLen(uint16_t len)
-    {
-        m_buffer[4] = static_cast<uint8_t>(len >> 8);
-        m_buffer[5] = static_cast<uint8_t>(len);
-    }
-
-    static void setHeader(uint8_t (&buffer)[FRAME_HEADER_LEN], ServerFrameId id, uint16_t len)
-    {
-        // uint8_t[SERVER_FRAME_HEADER_SIZE] buffer;
-
-        uint32_t id_uint32 = static_cast<uint32_t>(id);
-        // Endianness ...
-        buffer[0] = static_cast<uint8_t>(id_uint32 >> 24);
-        buffer[1] = static_cast<uint8_t>(id_uint32 >> 16);
-        buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
-        buffer[3] = static_cast<uint8_t>(id_uint32);
-
-        buffer[4] = static_cast<uint8_t>(len >> 8);
-        buffer[5] = static_cast<uint8_t>(len);
+        m_buffer[4] = static_cast<uint8_t>(len);
+        m_buffer[5] = static_cast<uint8_t>(number);*/
 
         // return buffer;
     }
 
-    uint16_t setData(uint8_t *data_buff, uint16_t data_len)
+    uint8_t setData(uint8_t *data_buff, uint8_t data_len)
     {
-        uint16_t len_to_copy = std::min(data_len, (uint16_t)(MaxFrameLen - FRAME_HEADER_LEN));
+        uint8_t len_to_copy = std::min(data_len, uint8_t(MaxFrameLen - FRAME_HEADER_LEN));
         memcpy(m_buffer + FRAME_DATA_OFFSET, data_buff, len_to_copy);
 
         return len_to_copy;
@@ -156,12 +166,18 @@ public:
 
     ServerFrameId getId()
     {
-        return static_cast<ServerFrameId>((uint32_t(m_buffer[0]) << 24) | (uint32_t(m_buffer[1]) << 16) | (uint32_t(m_buffer[2]) << 8) | (uint32_t(m_buffer[3])));
+        // return static_cast<ServerFrameId>((uint32_t(m_buffer[0]) << 24) | (uint32_t(m_buffer[1]) << 16) | (uint32_t(m_buffer[2]) << 8) | (uint32_t(m_buffer[3])));
+        return static_cast<ServerFrameId>(m_buffer[0]);
     }
 
-    uint16_t getLen()
+    uint8_t getLen()
     {
-        return (uint16_t(m_buffer[4]) << 8) | (uint16_t(m_buffer[5]));
+        return uint16_t(m_buffer[1]);
+    }
+
+    uint8_t getNumber()
+    {
+        return uint16_t(m_buffer[2]);
     }
 
     uint8_t *getDataPtr()
@@ -182,10 +198,11 @@ public:
 
     void debug()
     {
-        uint16_t len = getLen();
+        uint8_t len = getLen();
         ServerFrameId id = getId();
+        uint8_t nb = getNumber();
 
-        printf("ID: %ld\nLEN: %d\nData: [", static_cast<uint32_t>(id), len);
+        printf("ID: %ld\nLEN: %d\nNB: %d\nData: [", static_cast<uint32_t>(id), len, nb);
 
         for (uint8_t i = 0; i < len; i++)
         {
