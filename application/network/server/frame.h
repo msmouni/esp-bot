@@ -13,7 +13,6 @@ const uint8_t FRAME_LEN_OFFSET = 1;
 const uint8_t FRAME_HEADER_LEN = 3;
 const uint8_t FRAME_DATA_OFFSET = FRAME_HEADER_LEN;
 
-// To Maybe adjust later : 32bits ...
 enum class ServerFrameId : uint8_t
 {
     NotDefined = 0x00,
@@ -134,7 +133,7 @@ public:
         m_buffer[2] = number;
     }
 
-    static void setHeader(ServerFrameId id, uint8_t len, uint8_t number)
+    void setHeader(ServerFrameId id, uint8_t len, uint8_t number)
     {
 
         setId(id);

@@ -30,7 +30,7 @@ struct CamPicture
 {
     static const uint32_t MAX_PIC_LEN = 4096;
     static const uint8_t FRAME_DATA_SIZE = TcpIpServer::MAX_MSG_SIZE - FRAME_DATA_OFFSET;
-    static const uint8_t MAX_FRAMES_NB = MAX_PIC_LEN / uint32_t(FRAME_DATA_SIZE);
+    static const uint8_t MAX_FRAMES_NB = uint8_t(MAX_PIC_LEN / uint32_t(FRAME_DATA_SIZE));
 
     ServerFrame<TcpIpServer::MAX_MSG_SIZE> m_pic_frames[MAX_FRAMES_NB]; /*!< The pixel data */
     uint8_t m_stored_frames;
@@ -129,7 +129,7 @@ struct CamPicture
                 pic_frames_nb++;
             }
 
-            m_stored_frames = std::min(pic_frames_nb, MAX_FRAMES_NB);
+            m_stored_frames = pic_frames_nb; // MAX_FRAMES_NB; // std::min(pic_frames_nb, MAX_FRAMES_NB); // Undefined ref to MAX_FRAMES_NB...
 
             uint32_t remaining_bytes = (uint32_t)pic->len;
 
@@ -137,13 +137,13 @@ struct CamPicture
             {
                 if (remaining_bytes < uint32_t(FRAME_DATA_SIZE))
                 {
-                    m_pic_frames[i].setHeader(ServerFrameId::CamPic, uint8_t(remaining_bytes), m_stored_frames);
+                    m_pic_frames[i].setHeader(ServerFrameId::CamPic, uint8_t(remaining_bytes), m_stored_frames - i - 1);
                     m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), uint8_t(remaining_bytes));
                     remaining_bytes = 0;
                 }
                 else
                 {
-                    m_pic_frames[i].setHeader(ServerFrameId::CamPic, FRAME_DATA_SIZE, m_stored_frames);
+                    m_pic_frames[i].setHeader(ServerFrameId::CamPic, FRAME_DATA_SIZE, m_stored_frames - i - 1);
                     m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), FRAME_DATA_SIZE);
                     remaining_bytes -= FRAME_DATA_SIZE;
                 }
