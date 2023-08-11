@@ -12,7 +12,7 @@
 using namespace additional::result;
 using namespace additional::option;
 
-template <uint8_t MaxFrameLen>
+template <uint16_t MaxFrameLen>
 class Client
 {
 private:
@@ -92,11 +92,16 @@ public:
 
         if (r == 0)
         {
+            printf("Client_%d NoResponse\n", m_id);
             return Result<int, ClientError>(ClientError::NoResponse);
         }
         else if (r > 0)
         {
             return Result<int, ClientError>(r);
+        }
+        else if (errno == SOCKET_ERR_TRY_AGAIN)
+        {
+            return Result<int, ClientError>(0);
         }
         else
         {

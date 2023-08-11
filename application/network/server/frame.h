@@ -6,11 +6,11 @@
 #include <stdint.h>
 #include <algorithm>
 
-// ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t DATA[DATA_LEN]]
+// ServerFrame as uint16_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH[2], uint8_t DATA[DATA_LEN]]
 // Frame definition
 const uint32_t FRAME_ID_OFFSET = 0;
 const uint32_t FRAME_LEN_OFFSET = 4;
-const uint32_t FRAME_HEADER_LEN = 5;
+const uint32_t FRAME_HEADER_LEN = 6;
 const uint32_t FRAME_DATA_OFFSET = FRAME_HEADER_LEN;
 
 // To Maybe adjust later : 32bits ...
@@ -19,6 +19,7 @@ enum class ServerFrameId : uint32_t
     NotDefined = 0x00,
     Authentification = 0x01,
     Status = 0x02,
+    CamPic = 0x03,
     Debug = 0xFF,
     Unknown = UINT32_MAX,
 };
@@ -44,7 +45,7 @@ int r = read(socket, frame.getBufferRef(), MaxFrameLen);
 */
 
 // ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t DATA[DATA_LEN]]
-template <uint8_t MaxFrameLen>
+template <uint16_t MaxFrameLen>
 class ServerFrame
 {
 private:
@@ -76,7 +77,10 @@ public:
         // Endianness ...
         /*m_id = static_cast<ServerFrameId>((uint32_t(bytes_frame[0]) << 24) | (uint32_t(bytes_frame[1]) << 16) | (uint32_t(bytes_frame[2]) << 8) | (uint32_t(bytes_frame[3])));
 
-        m_len = std::min(bytes_frame[4], uint8_t(MaxFrameLen - 5));
+        uint16_t frame_len = ((uint16_t)(bytes_frame[4]) << 8) | (uint16_t)(bytes_frame[5]);
+        m_len = std::min(frame_len, (uint16_t)(MaxFrameLen - SERVER_FRAME_HEADER_SIZE));
+
+        m_number = bytes_frame[6];
 
         for (uint8_t i = 0; i < m_len; i++)
         {
@@ -98,11 +102,14 @@ public:
         buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
         buffer[3] = static_cast<uint8_t>(id_uint32);
 
-        buffer[4] = m_len;
+        buffer[4] = static_cast<uint8_t>(m_len >> 8);
+        buffer[5] = static_cast<uint8_t>(m_len);
 
-        for (uint8_t i = 5; i < MaxFrameLen; i++)
+        buffer[6] = m_number;
+
+        for (uint8_t i = SERVER_FRAME_HEADER_SIZE; i < MaxFrameLen; i++)
         {
-            buffer[i] = m_data[i - 5];
+            buffer[i] = m_data[i - SERVER_FRAME_HEADER_SIZE];
         }
     }*/
 
@@ -116,9 +123,35 @@ public:
         m_buffer[3] = static_cast<uint8_t>(id_uint32);
     }
 
-    void setLen(uint8_t len)
+    void setLen(uint16_t len)
     {
-        m_buffer[4] = len;
+        m_buffer[4] = static_cast<uint8_t>(len >> 8);
+        m_buffer[5] = static_cast<uint8_t>(len);
+    }
+
+    static void setHeader(uint8_t (&buffer)[FRAME_HEADER_LEN], ServerFrameId id, uint16_t len)
+    {
+        // uint8_t[SERVER_FRAME_HEADER_SIZE] buffer;
+
+        uint32_t id_uint32 = static_cast<uint32_t>(id);
+        // Endianness ...
+        buffer[0] = static_cast<uint8_t>(id_uint32 >> 24);
+        buffer[1] = static_cast<uint8_t>(id_uint32 >> 16);
+        buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
+        buffer[3] = static_cast<uint8_t>(id_uint32);
+
+        buffer[4] = static_cast<uint8_t>(len >> 8);
+        buffer[5] = static_cast<uint8_t>(len);
+
+        // return buffer;
+    }
+
+    uint16_t setData(uint8_t *data_buff, uint16_t data_len)
+    {
+        uint16_t len_to_copy = std::min(data_len, (uint16_t)(MaxFrameLen - FRAME_HEADER_LEN));
+        memcpy(m_buffer + FRAME_DATA_OFFSET, data_buff, len_to_copy);
+
+        return len_to_copy;
     }
 
     ServerFrameId getId()
@@ -126,9 +159,9 @@ public:
         return static_cast<ServerFrameId>((uint32_t(m_buffer[0]) << 24) | (uint32_t(m_buffer[1]) << 16) | (uint32_t(m_buffer[2]) << 8) | (uint32_t(m_buffer[3])));
     }
 
-    uint8_t getLen()
+    uint16_t getLen()
     {
-        return m_buffer[4];
+        return (uint16_t(m_buffer[4]) << 8) | (uint16_t(m_buffer[5]));
     }
 
     uint8_t *getDataPtr()
@@ -149,7 +182,7 @@ public:
 
     void debug()
     {
-        uint8_t len = getLen();
+        uint16_t len = getLen();
         ServerFrameId id = getId();
 
         printf("ID: %ld\nLEN: %d\nData: [", static_cast<uint32_t>(id), len);
@@ -207,7 +240,7 @@ struct AuthFrameData
         memcpy(m_login_password, login_password, login_pass_len);
     }
 
-    uint8_t toBytes(char *bytes)
+    uint16_t toBytes(char *bytes)
     {
 
         *bytes = (uint8_t)m_auth_req;
@@ -251,7 +284,7 @@ struct StatusFrameData
         m_auth_type = auth_type;
     }
 
-    uint8_t toBytes(char *bytes)
+    uint16_t toBytes(char *bytes)
     {
         *bytes = (uint8_t)m_auth_type;
 
