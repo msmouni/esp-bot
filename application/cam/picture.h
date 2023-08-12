@@ -214,8 +214,8 @@ struct CamPicture
 
     uint32_t getLen()
     {
-        // return m_len;
-        return MAX_PIC_LEN - 7; // TMP: Fixed for Stream (TCP)
+        return m_len;
+        // return MAX_PIC_LEN - 7; // TMP: Fixed for Stream (TCP)
     }
 
     /*void setProcessed()
