@@ -96,9 +96,9 @@ public:
     bool isPicAvailable();
     // Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> getNextFrame();
 
-    Option<void *> getNextFrameBuff();
+    Option<BuffRefLen> getNextFrameBuff();
 
-    uint32_t getLen();
+    uint32_t getPicLen();
 
     // void setProcessed();
 };

@@ -88,12 +88,12 @@ bool Camera::isPicAvailable()
 //     return m_pic.getNextFrame();
 // }
 
-Option<void *> Camera::getNextFrameBuff()
+Option<BuffRefLen> Camera::getNextFrameBuff()
 {
     return m_pic.getNextFrameBuff();
 }
 
-uint32_t Camera::getLen()
+uint32_t Camera::getPicLen()
 {
     return m_pic.getLen();
 }

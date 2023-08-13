@@ -222,6 +222,11 @@ Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsg(int 
                 printf("Client_%d: Error sending Udp: %d\n", m_clients[client_idx].getId(), errno);
                 return Result<int, ClientError>(ClientError::SocketWouldBlock);
             }
+            else if (errno == SOCKET_ERR_OUT_OF_MEMORY)
+            {
+                printf("Client_%d: Error sending Udp: %d\n", m_clients[client_idx].getId(), errno);
+                return Result<int, ClientError>(ClientError::SocketOutOfMemory);
+            }
             else
             {
                 printf("Client_%d: Error sending Udp: %d\n", m_clients[client_idx].getId(), errno);
@@ -252,45 +257,26 @@ Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsgToAll
     {
         for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
         {
-            sendUdpMsg(client_idx, msg_ptr, size);
-
-            /*ClientState client_state = m_clients[client_idx].getState();
-
-            if ((client_state == ClientState::Authenticated) | (client_state == ClientState::TakingControl))
+            // Maybe track error & retry elsewhere
+            bool done = false;
+            while (!done)
             {
-                sockaddr_in *client_addr = m_clients[client_idx].getAddrPtr();
-                WhichSocket &connected_to = m_clients[client_idx].getSocketConnectedTo();
+                Result<int, ClientError> res = sendUdpMsg(client_idx, msg_ptr, size);
 
-                int r = 0;
+                if (res.isErr())
+                {
+                    ClientError err = res.getErr();
 
-                if (ap_udpfd.isSome() && connected_to == WhichSocket::Ap)
-                {
-                    r = sendto(ap_udpfd.getData(), msg_ptr, size, 0,
-                               (struct sockaddr *)client_addr, sizeof(*client_addr)); // Todo: Check if r == size
-                }
-                else if (sta_udpfd.isSome() && connected_to == WhichSocket::Sta)
-                {
-                    r = sendto(sta_udpfd.getData(), msg_ptr, size, 0,
-                               (struct sockaddr *)client_addr, sizeof(*client_addr)); // Todo: Check if r == size
+                    if ((err != ClientError::SocketOutOfMemory) && (err != ClientError::SocketWouldBlock))
+                    {
+                        return res;
+                    }
                 }
                 else
                 {
-                    return Result<int, ClientError>(ClientError::NotReady);
+                    done = true;
                 }
-
-                if (r < 0)
-                {
-                    if (errno == SOCKET_ERR_TRY_AGAIN)
-                    {
-                        return Result<int, ClientError>(ClientError::SocketWouldBlock);
-                    }
-                    else
-                    {
-                        printf("Client_%d: Error sending Udp: %d\n", m_clients[client_idx].getId(), errno);
-                        return Result<int, ClientError>(ClientError::SocketError);
-                    }
-                }
-            }*/
+            }
         }
 
         return Result<int, ClientError>(size);

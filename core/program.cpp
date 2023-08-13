@@ -160,19 +160,24 @@ void MainProgram::update()
         if (m_camera.isPicAvailable())
         {
             bool done_sending = false;
+            /*
+            Note: when calling socket's sendto(void* buff) for example, buff is copied to the OS's network stack before beeing actually sent => Socket out of memory
+            */
 
             while (!done_sending)
             {
-                Option<void *> pic_frame_buff = m_camera.getNextFrameBuff();
+                Option<BuffRefLen> opt_pic_frame_buff_len = m_camera.getNextFrameBuff();
 
-                if (pic_frame_buff.isNone())
+                if (opt_pic_frame_buff_len.isNone())
                 {
                     done_sending = true;
                 }
                 else
                 {
-                    m_wifi->tryToSendUdpMsg(pic_frame_buff.getData(), TcpIpServer::MAX_MSG_SIZE); // TMP:len
+                    BuffRefLen pic_frame_buff_len = opt_pic_frame_buff_len.getData();
+                    m_wifi->tryToSendUdpMsg(pic_frame_buff_len.m_buff_ref, pic_frame_buff_len.m_len); // TcpIpServer::MAX_MSG_SIZE); // TMP:len
                 }
+                // vTaskDelay(1);
             }
             // void *ptr = m_camera.getFrameRef();
             // uint32_t len = m_camera.getLen();

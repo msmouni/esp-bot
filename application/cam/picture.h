@@ -18,6 +18,14 @@ uint32_t bytesToU32(char *p_buffer);
 
 #if ESP_CAMERA_SUPPORTED
 
+struct BuffRefLen
+{
+    void *m_buff_ref;
+    int m_len;
+
+    BuffRefLen(void *buff_ref = NULL, int len = 0) : m_buff_ref(buff_ref), m_len(len){};
+};
+
 enum class PictureState
 {
     Unavailable,
@@ -28,11 +36,13 @@ enum class PictureState
 
 struct CamPicture
 {
-    static const uint32_t MAX_PIC_LEN = 4096;
-    static const uint8_t FRAME_DATA_SIZE = TcpIpServer::MAX_MSG_SIZE - FRAME_DATA_OFFSET;
+    static const uint32_t MAX_PIC_LEN = 8192; // 4096;
+    // Note: https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32s2/api-reference/kconfig.html#config-esp32-wifi-tx-buffer
+    static const uint16_t MAX_MSG_SIZE = 1024; // The size of each static TX buffer is fixed to about 1.6KB
+    static const uint8_t FRAME_DATA_SIZE = MAX_MSG_SIZE - FRAME_DATA_OFFSET;
     static const uint8_t MAX_FRAMES_NB = uint8_t(MAX_PIC_LEN / uint32_t(FRAME_DATA_SIZE));
 
-    ServerFrame<TcpIpServer::MAX_MSG_SIZE> m_pic_frames[MAX_FRAMES_NB]; /*!< The pixel data */
+    ServerFrame<MAX_MSG_SIZE> m_pic_frames[MAX_FRAMES_NB]; /*!< The pixel data */
     uint8_t m_stored_frames;
     uint8_t m_processed_frames;
     uint32_t m_len;    /*!< Length of the buffer in bytes */
@@ -40,7 +50,7 @@ struct CamPicture
     uint32_t m_height; /*!< Height of the buffer in pixels */
     PictureState m_state = PictureState::Unavailable;
 
-    // static const uint32_t MAX_FRAME_DATA_LEN = TcpIpServer::MAX_MSG_SIZE - FRAME_HEADER_LEN; // See Frame
+    // static const uint32_t MAX_FRAME_DATA_LEN = MAX_MSG_SIZE - FRAME_HEADER_LEN; // See Frame
     // char m_frame_buff[MAX_PIC_LEN];
     // ServerFrame<MAX_FRAME_DATA_LEN> m_pic_frame = ServerFrame<MAX_FRAME_DATA_LEN>(ServerFrameId::CamPic);
     // uint8_t m_nb_frames_to_send;
@@ -129,20 +139,25 @@ struct CamPicture
                 pic_frames_nb++;
             }
 
-            m_stored_frames = pic_frames_nb; // MAX_FRAMES_NB; // std::min(pic_frames_nb, MAX_FRAMES_NB); // Undefined ref to MAX_FRAMES_NB...
+            m_stored_frames = std::min(pic_frames_nb, (uint8_t)MAX_FRAMES_NB); // MAX_FRAMES_NB; // pic_frames_nb; //   Undefined ref to MAX_FRAMES_NB...
 
             uint32_t remaining_bytes = (uint32_t)pic->len;
 
+            // printf("pic_le:%ld\n", remaining_bytes);
+
             for (int i = 0; i < m_stored_frames; i++)
             {
+
                 if (remaining_bytes < uint32_t(FRAME_DATA_SIZE))
                 {
+                    // printf("i1=%d\n", m_stored_frames - i - 1);
                     m_pic_frames[i].setHeader(ServerFrameId::CamPic, uint8_t(remaining_bytes), m_stored_frames - i - 1);
                     m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), uint8_t(remaining_bytes));
                     remaining_bytes = 0;
                 }
                 else
                 {
+                    // printf("i2=%d\n", m_stored_frames - i - 1);
                     m_pic_frames[i].setHeader(ServerFrameId::CamPic, FRAME_DATA_SIZE, m_stored_frames - i - 1);
                     m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), FRAME_DATA_SIZE);
                     remaining_bytes -= FRAME_DATA_SIZE;
@@ -192,10 +207,13 @@ struct CamPicture
         return &m_pic_frame_buff;
     }*/
 
-    Option<void *> getNextFrameBuff()
+    Option<BuffRefLen> getNextFrameBuff()
     {
         if (isAvailable())
         {
+            Option<BuffRefLen> next_frame_buff_len = Option<BuffRefLen>(BuffRefLen(m_pic_frames[m_processed_frames].getBufferRef(), m_pic_frames[m_processed_frames].getLen() + FRAME_HEADER_LEN));
+            // printf("i3:%d\n", m_processed_frames);
+
             m_processed_frames += 1;
 
             if (m_processed_frames == m_stored_frames)
@@ -204,11 +222,11 @@ struct CamPicture
                 m_state = PictureState::Processed;
             }
 
-            return Option<void *>(m_pic_frames[m_processed_frames - 1].getBufferRef());
+            return next_frame_buff_len;
         }
         else
         {
-            return Option<void *>();
+            return Option<BuffRefLen>();
         }
     }
 
@@ -223,7 +241,7 @@ struct CamPicture
         m_state = PictureState::Processed; // TMP: TODO: USE WATCHDOG
     }*/
 
-    /*Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> getNextFrame()
+    /*Option<ServerFrame<MAX_MSG_SIZE>> getNextFrame()
     {
         if ((m_state == PictureState::Available || m_state == PictureState::Processing) && (m_nb_processed_frames < m_nb_frames_to_send))
         {
@@ -244,16 +262,16 @@ struct CamPicture
                 // printf("PictureState::Processing\n");
             }
 
-            ServerFrame<TcpIpServer::MAX_MSG_SIZE> frame = ServerFrame<TcpIpServer::MAX_MSG_SIZE>(ServerFrameId::CamPic, (uint16_t)len_to_copy, (uint8_t)(m_nb_frames_to_send - m_nb_processed_frames), m_frame_buff);
+            ServerFrame<MAX_MSG_SIZE> frame = ServerFrame<MAX_MSG_SIZE>(ServerFrameId::CamPic, (uint16_t)len_to_copy, (uint8_t)(m_nb_frames_to_send - m_nb_processed_frames), m_frame_buff);
             // frame.debug();
 
-            Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>> res = Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>>(frame);
+            Option<ServerFrame<MAX_MSG_SIZE>> res = Option<ServerFrame<MAX_MSG_SIZE>>(frame);
 
             return res;
         }
         else
         {
-            return Option<ServerFrame<TcpIpServer::MAX_MSG_SIZE>>();
+            return Option<ServerFrame<MAX_MSG_SIZE>>();
         }
     }*/
 

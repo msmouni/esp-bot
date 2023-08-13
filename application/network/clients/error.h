@@ -8,12 +8,14 @@
     EAGAIN 11 : Try again
 */
 const int SOCKET_ERR_TRY_AGAIN = 11;
+const int SOCKET_ERR_OUT_OF_MEMORY = 12;
 
 enum class ClientError
 {
     NoResponse,
     NotReady,
     SocketWouldBlock,
+    SocketOutOfMemory,
     SocketError,
 };
 
