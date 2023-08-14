@@ -174,7 +174,10 @@ void MainProgram::update()
                 }
                 else
                 {
+
                     BuffRefLen pic_frame_buff_len = opt_pic_frame_buff_len.getData();
+
+                    // ESP_LOGI(LOG_TAG, "pic_frame_len=%d", pic_frame_buff_len.m_len);
                     m_wifi->tryToSendUdpMsg(pic_frame_buff_len.m_buff_ref, pic_frame_buff_len.m_len); // TcpIpServer::MAX_MSG_SIZE); // TMP:len
                 }
                 // vTaskDelay(1);

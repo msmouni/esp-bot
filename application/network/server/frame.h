@@ -6,12 +6,12 @@
 #include <stdint.h>
 #include <algorithm>
 
-// ServerFrame as uint16_t frame[Length]: uint8_t ID, uint8_t FRAME_LENGTH, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
+// ServerFrame as uint16_t frame[Length]: uint8_t ID, uint8_t FRAME_LENGTH_MS, uint8_t FRAME_LENGTH_LS, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
 // Frame definition
 const uint8_t FRAME_ID_OFFSET = 0;
 const uint8_t FRAME_LEN_OFFSET = 1;
-const uint8_t FRAME_HEADER_LEN = 3;
-const uint8_t FRAME_DATA_OFFSET = FRAME_HEADER_LEN;
+const uint8_t FRAME_DATA_OFFSET = 4;
+const uint16_t FRAME_HEADER_LEN = FRAME_DATA_OFFSET;
 
 enum class ServerFrameId : uint8_t
 {
@@ -44,7 +44,7 @@ int r = read(socket, frame.getBufferRef(), MaxFrameLen);
 */
 
 // ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
-template <uint8_t MaxFrameLen>
+template <uint16_t MaxFrameLen>
 class ServerFrame
 {
 private:
@@ -123,17 +123,18 @@ public:
         m_buffer[0] = static_cast<uint8_t>(id);
     }
 
-    void setLen(uint8_t len)
+    void setLen(uint16_t len)
     {
-        m_buffer[1] = len;
+        m_buffer[1] = static_cast<uint8_t>(len >> 8);
+        m_buffer[2] = static_cast<uint8_t>(len);
     }
 
     void setNumber(uint8_t number)
     {
-        m_buffer[2] = number;
+        m_buffer[3] = number;
     }
 
-    void setHeader(ServerFrameId id, uint8_t len, uint8_t number)
+    void setHeader(ServerFrameId id, uint16_t len, uint8_t number)
     {
 
         setId(id);
@@ -155,9 +156,9 @@ public:
         // return buffer;
     }
 
-    uint8_t setData(uint8_t *data_buff, uint8_t data_len)
+    uint8_t setData(uint8_t *data_buff, uint16_t data_len)
     {
-        uint8_t len_to_copy = std::min(data_len, uint8_t(MaxFrameLen - FRAME_HEADER_LEN));
+        uint16_t len_to_copy = std::min(data_len, uint16_t(MaxFrameLen - FRAME_HEADER_LEN));
         memcpy(m_buffer + FRAME_DATA_OFFSET, data_buff, len_to_copy);
 
         return len_to_copy;
@@ -169,20 +170,20 @@ public:
         return static_cast<ServerFrameId>(m_buffer[0]);
     }
 
-    uint8_t getLen()
+    uint16_t getLen()
     {
-        return uint16_t(m_buffer[1]);
+        return (uint16_t(m_buffer[1]) << 8 | uint16_t(m_buffer[2]));
     }
 
     uint8_t getNumber()
     {
-        return uint16_t(m_buffer[2]);
+        return uint16_t(m_buffer[3]);
     }
 
     uint8_t *getDataPtr()
     {
         // return m_data;
-        return m_buffer + FRAME_HEADER_LEN;
+        return m_buffer + FRAME_DATA_OFFSET;
     }
 
     uint8_t (&getBufferRef())[MaxFrameLen]
@@ -207,11 +208,11 @@ public:
         {
             if (i == len - 1)
             {
-                printf("%d", m_buffer[FRAME_HEADER_LEN + i]);
+                printf("%d", m_buffer[FRAME_DATA_OFFSET + i]);
             }
             else
             {
-                printf("%d ,", m_buffer[FRAME_HEADER_LEN + i]);
+                printf("%d ,", m_buffer[FRAME_DATA_OFFSET + i]);
             }
         }
 

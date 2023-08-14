@@ -36,11 +36,11 @@ enum class PictureState
 
 struct CamPicture
 {
-    static const uint32_t MAX_PIC_LEN = 8192; // 4096;
+    static const uint16_t MAX_PIC_LEN = 8192; // 4096;
     // Note: https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32s2/api-reference/kconfig.html#config-esp32-wifi-tx-buffer
     static const uint16_t MAX_MSG_SIZE = 1024; // The size of each static TX buffer is fixed to about 1.6KB
-    static const uint8_t FRAME_DATA_SIZE = MAX_MSG_SIZE - FRAME_DATA_OFFSET;
-    static const uint8_t MAX_FRAMES_NB = uint8_t(MAX_PIC_LEN / uint32_t(FRAME_DATA_SIZE));
+    static const uint16_t FRAME_DATA_SIZE = MAX_MSG_SIZE - FRAME_DATA_OFFSET;
+    static const uint8_t MAX_FRAMES_NB = uint8_t(MAX_PIC_LEN / FRAME_DATA_SIZE);
 
     ServerFrame<MAX_MSG_SIZE> m_pic_frames[MAX_FRAMES_NB]; /*!< The pixel data */
     uint8_t m_stored_frames;
@@ -143,7 +143,7 @@ struct CamPicture
 
             uint32_t remaining_bytes = (uint32_t)pic->len;
 
-            // printf("pic_le:%ld\n", remaining_bytes);
+            // printf("pic_len:%d | (height:%d, width:%d)\n", pic->len, pic->height, pic->width);
 
             for (int i = 0; i < m_stored_frames; i++)
             {
@@ -151,13 +151,14 @@ struct CamPicture
                 if (remaining_bytes < uint32_t(FRAME_DATA_SIZE))
                 {
                     // printf("i1=%d\n", m_stored_frames - i - 1);
-                    m_pic_frames[i].setHeader(ServerFrameId::CamPic, uint8_t(remaining_bytes), m_stored_frames - i - 1);
-                    m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), uint8_t(remaining_bytes));
+                    m_pic_frames[i].setHeader(ServerFrameId::CamPic, uint16_t(remaining_bytes), m_stored_frames - i - 1);
+                    m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), uint16_t(remaining_bytes));
                     remaining_bytes = 0;
                 }
                 else
                 {
                     // printf("i2=%d\n", m_stored_frames - i - 1);
+                    // printf("i2=%d\n", FRAME_DATA_SIZE);
                     m_pic_frames[i].setHeader(ServerFrameId::CamPic, FRAME_DATA_SIZE, m_stored_frames - i - 1);
                     m_pic_frames[i].setData(pic->buf + ((uint32_t)pic->len - remaining_bytes), FRAME_DATA_SIZE);
                     remaining_bytes -= FRAME_DATA_SIZE;
@@ -277,7 +278,7 @@ struct CamPicture
 
     // ServerFrame(ServerFrameId id, uint16_t len, uint8_t number, char (&data)[MaxFrameLen - 7])
 
-    // template <uint8_t MaxFrameLen>
+    // template <uint16_t MaxFrameLen>
     // void fill
 };
 
