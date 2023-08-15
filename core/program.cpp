@@ -17,10 +17,10 @@ MainProgram::MainProgram()
 
     WifiSetting wifi_setting = WifiSetting(wifi_ap_setting, wifi_sta_setting);
 
-    ServerConfig tcp_ip_server_config = ServerConfig(ServerLogin(Login("test_admin", "test_password"), Login("super_admin", "super_password")), 12345, 54321);
+    ServerConfig server_config = ServerConfig(ServerLogin(Login("test_admin", "test_password"), Login("super_admin", "super_password")), 12345, 54321);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    m_wifi = new Wifi(wifi_setting, tcp_ip_server_config);
+    m_wifi = new Wifi(wifi_setting, server_config);
 }
 
 MainProgram::~MainProgram()

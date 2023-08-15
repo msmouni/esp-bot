@@ -1,5 +1,5 @@
-#ifndef TCP_IP_CLIENT
-#define TCP_IP_CLIENT
+#ifndef CLIENT_H
+#define CLIENT_H
 
 #include "lwip/sockets.h"
 #include "state.h"
@@ -7,11 +7,12 @@
 #include "error.h"
 #include "frame.h"
 #include <errno.h>
+#include "handler.h"
 
 using namespace additional::result;
 using namespace additional::option;
 
-template <uint8_t MaxFrameLen>
+template <uint16_t MaxFrameLen>
 class Client
 {
 private:
@@ -19,6 +20,7 @@ private:
     int m_socket;              // Socket descriptor id
     struct sockaddr_in m_addr; // Address
     ClientState m_state;
+    WhichSocket m_connected_at;
 
     /*
     Note: Now, using {0} to initialize an aggregate like this is basically a trick to 0 the entire thing.
@@ -28,18 +30,19 @@ private:
     uint8_t m_bytes_buffer[MaxFrameLen] = {0};
 
 public:
-    Client() : m_id(0), m_socket(0), m_addr({}), m_state(ClientState::Uninitialized){};
+    Client() : m_id(0), m_socket(0), m_addr({}), m_state(ClientState::Uninitialized), m_connected_at(WhichSocket::Undefined){};
 
-    struct sockaddr_in *getAddrRef(void)
+    struct sockaddr_in *getAddrPtr(void)
     {
         return &m_addr;
     };
 
-    void connect(uint8_t id, int socket)
+    void connect(uint8_t id, ConnectedClient connected_socket)
     {
         m_id = id;
-        m_socket = socket;
+        m_socket = connected_socket.m_socket_fd;
         m_state = ClientState::Connected;
+        m_connected_at = connected_socket.m_connected_at;
     };
 
     void disconnect()
@@ -50,7 +53,7 @@ public:
         m_state = ClientState::Uninitialized;
     };
 
-    Result<Option<ServerFrame<MaxFrameLen>>, ClientError> tryToRecvMsg()
+    Result<Option<ServerFrame<MaxFrameLen>>, ClientError> tryToRecvTcpMsg()
     {
         // ends at b"\n"
         int r = read(m_socket, m_bytes_buffer, MaxFrameLen); // receive N_BYTES AT Once
@@ -79,20 +82,26 @@ public:
         }
     }
 
-    Result<int, ClientError> tryToSendMsg(ServerFrame<MaxFrameLen> frame)
+    Result<int, ClientError> tryToSendTcpMsg(ServerFrame<MaxFrameLen> &frame)
     {
-        frame.toBytes(m_bytes_buffer);
+        // frame.toBytes(m_bytes_buffer);
 
-        int r = send(m_socket, m_bytes_buffer, MaxFrameLen, 0);
-        bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
+        int r = send(m_socket, frame.getBufferRef(), MaxFrameLen, 0);
+        // bzero(m_bytes_buffer, MaxFrameLen); // clear buffer
+        // frame.clear();
 
         if (r == 0)
         {
+            printf("Client_%d NoResponse\n", m_id);
             return Result<int, ClientError>(ClientError::NoResponse);
         }
         else if (r > 0)
         {
             return Result<int, ClientError>(r);
+        }
+        else if (errno == SOCKET_ERR_TRY_AGAIN)
+        {
+            return Result<int, ClientError>(0);
         }
         else
         {
@@ -106,12 +115,12 @@ public:
         return m_socket;
     }
 
-    uint8_t getId()
+    uint8_t &getId()
     {
         return m_id;
     }
 
-    ClientState getState()
+    ClientState &getState()
     {
         return m_state;
     }
@@ -126,10 +135,16 @@ public:
         m_state = ClientState::TakingControl;
     }
 
-    void logout()
+    WhichSocket &getSocketConnectedTo()
+    {
+        return m_connected_at;
+    }
+
+    void
+    logout()
     {
         m_state = ClientState::Connected;
     }
 };
 
-#endif
+#endif // CLIENT_H

@@ -6,32 +6,31 @@
 #include <stdint.h>
 #include <algorithm>
 
-// To Maybe adjust later : 32bits ...
-enum class ServerFrameId : uint32_t
+// ServerFrame as uint8_t frame[Length]: uint8_t ID, uint8_t FRAME_LENGTH_MS, uint8_t FRAME_LENGTH_LS, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
+// Frame definition
+const uint8_t FRAME_ID_OFFSET = 0;
+const uint8_t FRAME_LEN_OFFSET = 1;
+const uint8_t FRAME_DATA_OFFSET = 4;
+const uint16_t FRAME_HEADER_LEN = FRAME_DATA_OFFSET;
+
+enum class ServerFrameId : uint8_t
 {
+    NotDefined = 0x00,
     Authentification = 0x01,
     Status = 0x02,
-    Debug = 0xFF,
+    Debug = 0x0F,
+    Unknown = UINT8_MAX,
 };
 
-// ServerFrame as uint8_t frame[Length]: [uint8_t ID[4], uint8_t FRAME_LENGTH, uint8_t DATA[DATA_LEN]]
-template <uint8_t MaxFrameLen>
+// ServerFrame as uint8_t frame[Length]: uint8_t ID, uint8_t FRAME_LENGTH_MS, uint8_t FRAME_LENGTH_LS, uint8_t FRAME_NB, uint8_t DATA[DATA_LEN]]
+template <uint16_t MaxFrameLen>
 class ServerFrame
 {
 private:
-    ServerFrameId m_id;
-    uint8_t m_len;
-    uint8_t m_data[MaxFrameLen - 5] = {0};
+    uint8_t m_buffer[MaxFrameLen] = {0};
 
 public:
     ServerFrame(){};
-    ServerFrame(ServerFrameId id, uint8_t len, char (&data)[MaxFrameLen - 5]) : m_id(id), m_len(len)
-    {
-        for (uint8_t i = 0; i < MaxFrameLen - 5; i++)
-        {
-            m_data[i] = data[i];
-        }
-    };
     ~ServerFrame(){};
 
     // https://www.nextptr.com/question/a6212599/passing-cplusplus-arrays-to-function-by-reference
@@ -39,16 +38,7 @@ public:
 
     void fromBytes(uint8_t (&bytes_frame)[MaxFrameLen])
     {
-
-        // Endianness ...
-        m_id = static_cast<ServerFrameId>((uint32_t(bytes_frame[0]) << 24) | (uint32_t(bytes_frame[1]) << 16) | (uint32_t(bytes_frame[2]) << 8) | (uint32_t(bytes_frame[3])));
-
-        m_len = std::min(bytes_frame[4], uint8_t(MaxFrameLen - 5));
-
-        for (uint8_t i = 0; i < m_len; i++)
-        {
-            m_data[i] = bytes_frame[i + 5];
-        }
+        memcpy(m_buffer, bytes_frame, MaxFrameLen);
     }
 
     ServerFrame(uint8_t (&bytes_frame)[MaxFrameLen])
@@ -56,55 +46,89 @@ public:
         fromBytes(bytes_frame);
     };
 
-    void toBytes(uint8_t (&buffer)[MaxFrameLen])
+    void setId(ServerFrameId id)
     {
-        uint32_t id_uint32 = static_cast<uint32_t>(m_id);
-        // Endianness ...
-        buffer[0] = static_cast<uint8_t>(id_uint32 >> 24);
-        buffer[1] = static_cast<uint8_t>(id_uint32 >> 16);
-        buffer[2] = static_cast<uint8_t>(id_uint32 >> 8);
-        buffer[3] = static_cast<uint8_t>(id_uint32);
+        m_buffer[0] = static_cast<uint8_t>(id);
+    }
 
-        buffer[4] = m_len;
+    void setLen(uint16_t len)
+    {
+        m_buffer[1] = static_cast<uint8_t>(len >> 8);
+        m_buffer[2] = static_cast<uint8_t>(len);
+    }
 
-        for (uint8_t i = 5; i < MaxFrameLen; i++)
-        {
-            buffer[i] = m_data[i - 5];
-        }
+    void setNumber(uint8_t number)
+    {
+        m_buffer[3] = number;
+    }
+
+    void setHeader(ServerFrameId id, uint16_t len, uint8_t number)
+    {
+
+        setId(id);
+        setLen(len);
+        setNumber(number);
+    }
+
+    uint8_t setData(uint8_t *data_buff, uint16_t data_len)
+    {
+        uint16_t len_to_copy = std::min(data_len, uint16_t(MaxFrameLen - FRAME_HEADER_LEN));
+        memcpy(m_buffer + FRAME_DATA_OFFSET, data_buff, len_to_copy);
+
+        return len_to_copy;
+    }
+
+    ServerFrameId getId()
+    {
+        return static_cast<ServerFrameId>(m_buffer[0]);
+    }
+
+    uint16_t getLen()
+    {
+        return (uint16_t(m_buffer[1]) << 8 | uint16_t(m_buffer[2]));
+    }
+
+    uint8_t getNumber()
+    {
+        return uint16_t(m_buffer[3]);
+    }
+
+    uint8_t *getDataPtr()
+    {
+        return m_buffer + FRAME_DATA_OFFSET;
+    }
+
+    uint8_t (&getBufferRef())[MaxFrameLen]
+    {
+        return m_buffer;
+    }
+
+    void clear()
+    {
+        bzero(m_buffer, MaxFrameLen);
     }
 
     void debug()
     {
-        printf("ID: %ld\nLEN: %d\nData: [", static_cast<uint32_t>(m_id), m_len);
+        uint8_t len = getLen();
+        ServerFrameId id = getId();
+        uint8_t nb = getNumber();
 
-        for (uint8_t i = 0; i < m_len; i++)
+        printf("ID: %ld\nLEN: %d\nNB: %d\nData: [", static_cast<uint32_t>(id), len, nb);
+
+        for (uint8_t i = 0; i < len; i++)
         {
-            if (i == m_len - 1)
+            if (i == len - 1)
             {
-                printf("%d", m_data[i]);
+                printf("%d", m_buffer[FRAME_DATA_OFFSET + i]);
             }
             else
             {
-                printf("%d ,", m_data[i]);
+                printf("%d ,", m_buffer[FRAME_DATA_OFFSET + i]);
             }
         }
 
         printf("]\n");
-    }
-
-    ServerFrameId &getId()
-    {
-        return m_id;
-    }
-
-    uint8_t getLen()
-    {
-        return m_len;
-    }
-
-    uint8_t (&getData())[MaxFrameLen - 5]
-    {
-        return m_data;
     }
 };
 
@@ -145,7 +169,7 @@ struct AuthFrameData
         memcpy(m_login_password, login_password, login_pass_len);
     }
 
-    uint8_t toBytes(char *bytes)
+    uint16_t toBytes(char *bytes)
     {
 
         *bytes = (uint8_t)m_auth_req;
@@ -189,7 +213,7 @@ struct StatusFrameData
         m_auth_type = auth_type;
     }
 
-    uint8_t toBytes(char *bytes)
+    uint16_t toBytes(char *bytes)
     {
         *bytes = (uint8_t)m_auth_type;
 

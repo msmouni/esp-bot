@@ -2,7 +2,7 @@ enum class ServerState
 {
     NotStarted,
     Uninitialized,
-    SocketsListening,
+    SocketsReady,
     Running,
     Error,
 };
