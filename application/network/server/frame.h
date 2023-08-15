@@ -18,6 +18,7 @@ enum class ServerFrameId : uint8_t
     NotDefined = 0x00,
     Authentification = 0x01,
     Status = 0x02,
+    CamPic = 0x03,
     Debug = 0x0F,
     Unknown = UINT8_MAX,
 };

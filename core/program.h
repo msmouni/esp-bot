@@ -1,5 +1,6 @@
 #include "nvs_flash.h"
 #include "wifi.h"
+#include "cam.h"
 #include "state.h"
 
 // final specifies that this class may not appear in the base-specifier-list of another class definition (in other words, cannot be derived from).
@@ -11,13 +12,20 @@ private:
 
     MainState m_state;
 
+    Wifi *m_wifi = NULL;
+#if ESP_CAMERA_SUPPORTED
+    Camera m_camera = Camera();
+#endif
+
     esp_err_t initNvs();
 
     esp_err_t setup(void);
 
-    void update(void);
+#if ESP_CAMERA_SUPPORTED
+    void updateCam(void); // Maybe move elsewhere
+#endif
 
-    Wifi *m_wifi = NULL;
+    void update(void);
 
 public:
     MainProgram(void);
