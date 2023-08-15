@@ -55,7 +55,7 @@ void Wifi::configure_ap(ApSetting &ap_setting)
 
         m_config.ap_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     }
-    m_config.ap_config.ap.max_connection = TcpIpServer::NB_ALLOWED_CLIENTS; // Maximal STA connections
+    m_config.ap_config.ap.max_connection = NetServer::NB_ALLOWED_CLIENTS; // Maximal STA connections
     m_config.ap_config.ap.pmf_cfg.required = false;
 
     ESP_LOGI(WIFI_TAG, "AP  CONFIG SSID: %s | PASS: %s", m_config.ap_config.ap.ssid, m_config.ap_config.ap.password);
@@ -219,7 +219,7 @@ esp_err_t Wifi::connect()
     return status;
 }
 
-ServerError Wifi::startTcpServer()
+ServerError Wifi::startServer()
 {
     if (getState() == WifiState::Connected)
     {
@@ -227,7 +227,7 @@ ServerError Wifi::startTcpServer()
         Option<ServerSocketDesc> ap_socket_desc = Option<ServerSocketDesc>(ServerSocketDesc(m_netiface.m_setting.m_ap_setting.m_ip_config.ip, m_server_config.m_ap_socket_port));
         Option<ServerSocketDesc> sta_socket_desc = Option<ServerSocketDesc>(ServerSocketDesc(m_netiface.m_setting.m_sta_setting.m_ip_config.ip, m_server_config.m_sta_socket_port));
 
-        m_tcp_ip_server.start(ApStaSocketsDesc(ap_socket_desc, sta_socket_desc), m_server_config.m_login);
+        m_server.start(ApStaSocketsDesc(ap_socket_desc, sta_socket_desc), m_server_config.m_login);
 
         return ServerError::None;
     }
@@ -269,28 +269,28 @@ WifiResult Wifi::update()
     }
     case WifiState::Connected:
     {
-        m_error.server_err = startTcpServer();
+        m_error.server_err = startServer();
 
         if ((m_error.esp_err != ESP_OK) | (m_error.server_err != ServerError::None))
         {
-            ESP_LOGE(WIFI_TAG, "Error while starting TCP/IP server");
+            ESP_LOGE(WIFI_TAG, "Error while starting server");
             m_state_handler.changeState(WifiState::Error);
             return WifiResult::Err;
         }
         else
         {
-            m_state_handler.changeState(WifiState::TcpIpServerRunning);
+            m_state_handler.changeState(WifiState::NetServerRunning);
         }
 
         break;
     }
-    case WifiState::TcpIpServerRunning:
+    case WifiState::NetServerRunning:
     {
-        m_error.server_err = m_tcp_ip_server.update();
+        m_error.server_err = m_server.update();
 
         if ((m_error.esp_err != ESP_OK) | (m_error.server_err != ServerError::None))
         {
-            ESP_LOGE(WIFI_TAG, "Error while running TCP/IP server");
+            ESP_LOGE(WIFI_TAG, "Error while running server");
             m_state_handler.changeState(WifiState::Error);
             return WifiResult::Err;
         }
@@ -312,6 +312,11 @@ WifiState Wifi::getState()
 {
     // Copy
     return m_state_handler.getState();
+}
+
+bool Wifi::tryToSendUdpMsg(void *data_ptr, size_t data_size)
+{
+    return m_server.tryToSendUdpMsg(data_ptr, data_size);
 }
 
 void Wifi::log(const char *debug_msg)

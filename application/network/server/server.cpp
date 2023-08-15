@@ -1,33 +1,35 @@
 #include "server.h"
 
-CircularBuffer<StatusFrameData, 10> TcpIpServer::m_pending_status_data = {};
+CircularBuffer<StatusFrameData, 10> NetServer::m_pending_status_data = {};
 
-void TcpIpServer::tryToSendMsg_25ms(void *args)
+void NetServer::tryToSendMsg25ms(void *args)
 {
     StatusFrameData status_data = StatusFrameData();
 
     m_pending_status_data.push(status_data);
 }
 
-TcpIpServer::TcpIpServer()
+NetServer::NetServer()
 {
     m_state = ServerState::NotStarted;
 }
-TcpIpServer::~TcpIpServer()
+NetServer::~NetServer()
 {
     m_socket_handler.stop();
     delete m_timer_send_25ms;
 }
 
-void TcpIpServer::start(ApStaSocketsDesc sockets_desc, ServerLogin login)
+void NetServer::start(ApStaSocketsDesc sockets_desc, ServerLogin login)
 {
     m_socket_handler.start(sockets_desc);
+
     m_clients.setServerLogin(login);
-    m_timer_send_25ms = new PeriodicTimer("TCP_IP_Server_25ms", tryToSendMsg_25ms, NULL, 25000);
+
+    m_timer_send_25ms = new PeriodicTimer("Server_25ms", tryToSendMsg25ms, NULL, 25000);
     m_state = ServerState::Uninitialized;
 }
 
-void TcpIpServer::stop()
+void NetServer::stop()
 {
     if ((m_state != ServerState::NotStarted) & (m_state != ServerState::Uninitialized))
     {
@@ -42,7 +44,7 @@ void TcpIpServer::stop()
     m_state = ServerState::NotStarted;
 }
 
-ServerError TcpIpServer::update()
+ServerError NetServer::update()
 {
     switch (m_state)
     {
@@ -54,14 +56,14 @@ ServerError TcpIpServer::update()
             m_state = ServerState::Error;
             return ServerError::SocketError;
         }
-        else if (m_socket_handler.isListening())
+        else if (m_socket_handler.isReady())
         {
-            m_state = ServerState::SocketsListening;
+            m_state = ServerState::SocketsReady;
         }
 
         break;
     }
-    case ServerState::SocketsListening:
+    case ServerState::SocketsReady:
     {
         esp_err_t res_strt = m_timer_send_25ms->start();
         if (res_strt != ESP_OK)
@@ -82,6 +84,17 @@ ServerError TcpIpServer::update()
     }
     case ServerState::Running:
     {
+        if (m_socket_handler.isReady())
+        {
+            if (!m_clients.hasApUdpFd())
+            {
+                m_clients.setApUdpFd(m_socket_handler.getApUdpFd());
+            }
+            if (!m_clients.hasStaUdpFd())
+            {
+                m_clients.setStaUdpFd(m_socket_handler.getStaUdpFd());
+            }
+        }
 
         tryToConnetClient();
 
@@ -92,7 +105,7 @@ ServerError TcpIpServer::update()
 
         m_clients.update();
 
-        tryToRecvMsg();
+        tryToRecvTcpMsg();
 
         break;
     }
@@ -105,7 +118,7 @@ ServerError TcpIpServer::update()
     return ServerError::None;
 }
 
-void TcpIpServer::tryToConnetClient()
+void NetServer::tryToConnetClient()
 {
     Option<sockaddr_in *> opt_next_client_addr = m_clients.getNextClientAddr();
 
@@ -116,7 +129,7 @@ void TcpIpServer::tryToConnetClient()
 
         sockaddr_in *next_client_addr = opt_next_client_addr.getData();
 
-        Option<int> res_connect_client = m_socket_handler.tryToConnetClient(next_client_addr);
+        Option<ConnectedClient> res_connect_client = m_socket_handler.tryToConnetClient(next_client_addr);
 
         if (res_connect_client
                 .isSome())
@@ -129,32 +142,41 @@ void TcpIpServer::tryToConnetClient()
 }
 
 // TODO: STORE MSGs IN BUFFER
-void TcpIpServer::tryToRecvMsg()
+void NetServer::tryToRecvTcpMsg()
 {
+    // CONTROL messages ...
     // TMP
-    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvMsg();
+    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvTcpMsg();
 
     if (opt_msg.isSome())
     {
         // TMP
-        uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
+        // uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
 
         ServerFrame<MAX_MSG_SIZE> msg = opt_msg.getData();
 
+        ESP_LOGI(SERVER_TAG, "Client_%d:", m_clients.getClientTakingControl().getData());
+
         msg.debug();
 
-        msg.toBytes(m_recv_buffer);
+        // msg.toBytes(m_recv_buffer);
 
-        ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
+        // ESP_LOGI(SERVER_TAG, "Client_%d: %.*s", m_clients.getClientTakingControl().getData(), MAX_MSG_SIZE, m_recv_buffer);
     }
 }
 
-void TcpIpServer::tryToSendMsg(ServerFrame<MAX_MSG_SIZE> frame)
+void NetServer::tryToSendTcpMsg(ServerFrame<MAX_MSG_SIZE> frame)
 {
-    m_clients.sendMsg(frame);
+    m_clients.sendTcpMsg(frame);
 }
 
-void TcpIpServer::tryToSendStatus(StatusFrameData status_data)
+void NetServer::tryToSendStatus(StatusFrameData status_data)
 {
     m_clients.sendStatus(status_data);
+}
+
+bool NetServer::tryToSendUdpMsg(void *data_ptr, size_t data_size)
+{
+
+    return m_clients.sendUdpMsgToAll(data_ptr, data_size).isOk();
 }

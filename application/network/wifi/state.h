@@ -20,7 +20,7 @@ enum class WifiState
     SettingIp,
     WaitingForIp,
     Connected,
-    TcpIpServerRunning,
+    NetServerRunning,
     Disconnected,
     Error,
 };

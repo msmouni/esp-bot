@@ -16,16 +16,15 @@
 #include "timer.h"
 #include "handler.h"
 
-class TcpIpServer
+class NetServer
 {
 public:
     static const int NB_ALLOWED_CLIENTS = 5; // number of allowed clients
+    static const uint8_t MAX_MSG_SIZE = 128; //  To adjust later reg Msgs to send
 private:
     // Debug Tag
     constexpr static const char *SERVER_TAG = "SERVER";
 
-    static const int MAX_MSG_SIZE = 128; // To adjust later reg Msgs to send
-    // static CircularBuffer<ServerFrame<MAX_MSG_SIZE>, 50> m_pending_send_msg;
     static CircularBuffer<StatusFrameData, 10> m_pending_status_data;
 
     SocketsHandler m_socket_handler = SocketsHandler(NB_ALLOWED_CLIENTS);
@@ -42,18 +41,20 @@ private:
     void tryToConnetClient();
 
     // Message receive of a given size
-    void tryToRecvMsg();
+    void tryToRecvTcpMsg();
 
-    void tryToSendMsg(ServerFrame<MAX_MSG_SIZE>);
+    void tryToSendTcpMsg(ServerFrame<MAX_MSG_SIZE>);
     void tryToSendStatus(StatusFrameData);
 
-    static void tryToSendMsg_25ms(void *);
+    static void tryToSendMsg25ms(void *);
 
 public:
-    TcpIpServer();
-    ~TcpIpServer();
+    NetServer();
+    ~NetServer();
     void start(ApStaSocketsDesc, ServerLogin);
     void stop();
+
+    bool tryToSendUdpMsg(void *, size_t);
 
     ServerError update();
 };

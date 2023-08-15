@@ -28,7 +28,7 @@ enum class SocketState
     Uninitialized,
     Created,
     Bound,
-    Listening,
+    Ready,
     Error,
 };
 
@@ -41,8 +41,10 @@ enum class SocketError
     ErrorConnectingToClient,
 };
 
+// Inherit From socket: Stream (TCP) | Datagram (UDP)
 class Socket
 {
+protected:
     const char *M_LOG_TAG;
 
     int m_socket; // Socket descriptor id
@@ -56,33 +58,58 @@ class Socket
 
     socklen_t m_socket_addr_len = sizeof(sockaddr_in);
 
+public:
+    Socket(const char *, WhichSocket);
+    virtual ~Socket() = 0;
+
+    void start(ServerSocketDesc &);
+    void stop();
+
+    virtual SocketError update() = 0;
+    SocketState getState();
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ConnectedClient
+{
+    int m_socket_fd;
+    WhichSocket m_connected_at;
+
+    ConnectedClient(){};
+    ConnectedClient(int socket_fd, WhichSocket connected_at) : m_socket_fd(socket_fd), m_connected_at(connected_at) {}
+};
+
+class TcpSocket : public Socket
+{
+
     uint8_t m_nb_allowed_clients;
 
 public:
-    Socket(const char *, uint8_t, WhichSocket);
-    ~Socket();
-
-    void start(ServerSocketDesc);
-    void stop();
+    TcpSocket(const char *, uint8_t, WhichSocket);
+    ~TcpSocket();
 
     SocketError update();
-    SocketState getState();
     Option<int> tryToConnetClient(sockaddr_in *);
 };
 
-enum class ApStaSocketsState
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// enum class DatagramError{
+
+// }
+
+class UdpSocket : public Socket
 {
-    NotStarted,
-    InitializingAp,
-    InitializingSta,
-    InitializingApSta,
-    ListeningOnSta,
-    ListeningOnAp,
-    ListeningOnApSta,
-    ErrorOnAp,
-    ErrorOnSta,
-    ErrorOnApSta,
+public:
+    UdpSocket(const char *, WhichSocket);
+    ~UdpSocket();
+
+    SocketError update();
+    int getFd();
 };
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum class SocketsHandlerError
 {
@@ -92,29 +119,86 @@ enum class SocketsHandlerError
     ErrorOnApSta
 };
 
-class SocketsHandler
+enum class HandlerState
 {
-    const char *M_LOG_TAG = "SocketsHandler";
+    NotStarted,
+    InitializingAp,
+    InitializingSta,
+    InitializingApSta,
+    ReadyOnSta,
+    ReadyOnAp,
+    ReadyOnApSta,
+    ErrorOnAp,
+    ErrorOnSta,
+    ErrorOnApSta,
+};
 
-    Socket *m_ap_socket;
-    Socket *m_sta_socket;
+class TcpSocketsHandler
+{
+    const char *M_LOG_TAG = "TcpSocketsHandler";
 
-    ApStaSocketsState m_state;
+    TcpSocket *m_ap_socket;
+    TcpSocket *m_sta_socket;
+
+    HandlerState m_state;
     SocketsHandlerError m_error;
 
     uint8_t m_nb_allowed_clients;
 
 public:
-    SocketsHandler(uint8_t);
-    ~SocketsHandler();
+    TcpSocketsHandler(uint8_t);
+    ~TcpSocketsHandler();
 
-    void start(ApStaSocketsDesc);
+    void start(ApStaSocketsDesc &);
     void stop();
 
     SocketsHandlerError update();
-    ApStaSocketsState getState();
-    bool isListening();
-    Option<int> tryToConnetClient(sockaddr_in *);
+    HandlerState getState();
+    bool isReady();
+    Option<ConnectedClient> tryToConnetClient(sockaddr_in *);
+};
+
+class UdpSocketsHandler
+{
+    const char *M_LOG_TAG = "UdpSocketsHandler";
+
+    UdpSocket *m_ap_socket;
+    UdpSocket *m_sta_socket;
+
+    HandlerState m_state;
+    SocketsHandlerError m_error;
+
+public:
+    UdpSocketsHandler();
+    ~UdpSocketsHandler();
+
+    void start(ApStaSocketsDesc &);
+    void stop();
+
+    SocketsHandlerError update();
+    HandlerState getState();
+    bool isReady();
+    Option<int> getApSocketFd();
+    Option<int> getStaSocketFd();
+};
+
+class SocketsHandler
+{
+    UdpSocketsHandler *m_udp_handler;
+    TcpSocketsHandler *m_tcp_handler;
+
+public:
+    SocketsHandler(uint8_t);
+    ~SocketsHandler();
+
+    void start(ApStaSocketsDesc &);
+    void stop();
+
+    SocketsHandlerError update();
+    bool isReady();
+    Option<ConnectedClient> tryToConnetClient(sockaddr_in *);
+    Option<int> getApUdpFd();
+    Option<int> getStaUdpFd();
 };
 
 #endif // SOCKETS_HANDLER_H

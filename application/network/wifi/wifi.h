@@ -47,11 +47,11 @@ private:
 
     esp_err_t init(void);
     esp_err_t connect(void);
-    ServerError startTcpServer();
+    ServerError startServer();
 
     WifiError m_error = {};
 
-    TcpIpServer m_tcp_ip_server;
+    NetServer m_server;
     ServerConfig m_server_config;
     NetworkIface m_netiface = {};
 
@@ -79,6 +79,7 @@ Refs: https://www.geeksforgeeks.org/rule-of-three-in-cpp/
 
     WifiResult update(void);
     WifiState getState(void);
+    bool tryToSendUdpMsg(void *data_ptr, size_t data_size);
     static void log(const char *debug_msg);
 };
 
