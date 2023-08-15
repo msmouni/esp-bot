@@ -1,3 +1,4 @@
+![Continuous Integration](https://github.com/msmouni/esp-bot/actions/workflows/esp-idf.yml/badge.svg?branch=master) 
 # esp32-robot
 
 # Notes:
