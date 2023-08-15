@@ -1,4 +1,4 @@
-![Continuous Integration](https://github.com/msmouni/esp-bot/actions/workflows/esp-idf.yml/badge.svg?branch=master) 
+![Continuous Integration](https://github.com/msmouni/esp-bot/actions/workflows/esp-idf.yml/badge.svg?branch=main) 
 # esp32-robot
 
 # Notes:
