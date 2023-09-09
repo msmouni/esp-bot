@@ -254,25 +254,12 @@ Result<int, ClientError> Clients<NbAllowedClients, MaxFrameLen>::sendUdpMsgToAll
     {
         for (int client_idx = 0; client_idx < m_nb_connected_clients; client_idx++)
         {
-            // Maybe track error & retry elsewhere
-            bool done = false;
-            while (!done)
+            Result<int, ClientError> res = sendUdpMsg(client_idx, msg_ptr, size);
+
+            if (res.isErr())
             {
-                Result<int, ClientError> res = sendUdpMsg(client_idx, msg_ptr, size);
 
-                if (res.isErr())
-                {
-                    ClientError err = res.getErr();
-
-                    if ((err != ClientError::SocketOutOfMemory) && (err != ClientError::SocketWouldBlock))
-                    {
-                        return res;
-                    }
-                }
-                else
-                {
-                    done = true;
-                }
+                return res;
             }
         }
 

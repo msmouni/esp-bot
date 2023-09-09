@@ -94,6 +94,7 @@ public:
     bool isPicAvailable();
 
     Option<BuffRefLen> getNextFrameBuff();
+    void setCurrentFrameProcessed();
 
     uint32_t getPicLen();
 };

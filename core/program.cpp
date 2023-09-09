@@ -133,8 +133,14 @@ void MainProgram::updateCam()
 
                 BuffRefLen pic_frame_buff_len = opt_pic_frame_buff_len.getData();
 
-                // ESP_LOGI(LOG_TAG, "pic_frame_len=%d", pic_frame_buff_len.m_len);
-                m_wifi->tryToSendUdpMsg(pic_frame_buff_len.m_buff_ref, pic_frame_buff_len.m_len); // NetServer::MAX_MSG_SIZE); // TMP:len
+                if (m_wifi->tryToSendUdpMsg(pic_frame_buff_len.m_buff_ref, pic_frame_buff_len.m_len))
+                {
+                    m_camera.setCurrentFrameProcessed();
+                }
+                else
+                {
+                    done_sending = true;
+                }
             }
         }
     }
