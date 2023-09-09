@@ -101,8 +101,18 @@ struct CamPicture
     {
         if (isAvailable())
         {
-            Option<BuffRefLen> next_frame_buff_len = Option<BuffRefLen>(BuffRefLen(m_pic_frames[m_processed_frames].getBufferRef(), m_pic_frames[m_processed_frames].getLen() + FRAME_HEADER_LEN));
+            return Option<BuffRefLen>(BuffRefLen(m_pic_frames[m_processed_frames].getBufferRef(), m_pic_frames[m_processed_frames].getLen() + FRAME_HEADER_LEN));
+        }
+        else
+        {
+            return Option<BuffRefLen>();
+        }
+    }
 
+    void setCurrentFrameProcessed()
+    {
+        if (isAvailable())
+        {
             m_processed_frames += 1;
 
             if (m_processed_frames == m_stored_frames)
@@ -110,12 +120,6 @@ struct CamPicture
                 m_processed_frames = 0;
                 m_state = PictureState::Processed;
             }
-
-            return next_frame_buff_len;
-        }
-        else
-        {
-            return Option<BuffRefLen>();
         }
     }
 

@@ -86,6 +86,11 @@ Option<BuffRefLen> Camera::getNextFrameBuff()
     return m_pic.getNextFrameBuff();
 }
 
+void Camera::setCurrentFrameProcessed()
+{
+    m_pic.setCurrentFrameProcessed();
+}
+
 uint32_t Camera::getPicLen()
 {
     return m_pic.getLen();
