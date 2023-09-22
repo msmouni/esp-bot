@@ -151,6 +151,7 @@ void MainProgram::update()
 {
     if (m_state == MainState::Running)
     {
+        // TODO: use camera only when needed (client request ...)
 #if ESP_CAMERA_SUPPORTED
         updateCam();
 #endif

@@ -25,7 +25,6 @@ enum class PictureState
 {
     Unavailable,
     Available,
-    Processing,
     Processed,
 };
 

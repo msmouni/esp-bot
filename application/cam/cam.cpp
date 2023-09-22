@@ -4,13 +4,16 @@ CamPicture Camera::m_pic = {};
 
 void Camera::takePic100ms(void *args)
 {
-    // ESP_LOGI(M_TAG, "Taking picture...");
-    camera_fb_t *pic = esp_camera_fb_get();
+    if (!m_pic.isAvailable())
+    {
+        // ESP_LOGI(M_TAG, "Taking picture...");
+        camera_fb_t *pic = esp_camera_fb_get();
 
-    m_pic.update(pic);
+        m_pic.update(pic);
 
-    // ESP_LOGI(M_TAG, "Picture taken! Its size was: %zu bytes format: %d", pic->len, (int)pic->format);
-    esp_camera_fb_return(pic);
+        // ESP_LOGI(M_TAG, "Picture taken! Its size was: %zu bytes format: %d", pic->len, (int)pic->format);
+        esp_camera_fb_return(pic);
+    }
 }
 
 Camera::Camera()
