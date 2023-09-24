@@ -1,5 +1,14 @@
 #include "program.h"
 
+bool MainProgram::m_gpio_state = false;
+
+void MainProgram::gpioToggle1s(void *args)
+{
+    m_gpio_state = !m_gpio_state;
+    // bool state = m_gpio_tst.state();
+    // m_gpio_tst.set(!state);
+}
+
 MainProgram::MainProgram()
 {
     m_state = MainState::Uninitialized;
@@ -47,6 +56,17 @@ esp_err_t MainProgram::setup()
         status = m_camera.init();
     }
 #endif
+
+    if (ESP_OK == status)
+    {
+        ESP_LOGI(LOG_TAG, "Initializing GPIO");
+        status = m_gpio_tst.init();
+        if (ESP_OK == status)
+        {
+            m_timer_gpio_toggle = new PeriodicTimer("Camera_Take_Pic_100ms", gpioToggle1s, NULL, 1000000);
+            status = m_timer_gpio_toggle->start();
+        }
+    }
 
     return status;
 };
@@ -159,5 +179,7 @@ void MainProgram::update()
         {
             m_state = MainState::Error;
         }
+
+        m_gpio_tst.set(m_gpio_state);
     }
 }

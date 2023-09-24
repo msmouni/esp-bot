@@ -5,4 +5,5 @@ idf_component_register(SRCS ${SOURCES}
     REQUIRES freertos
     esp_common
     network
-    tools)
+    tools
+    io_pin)
