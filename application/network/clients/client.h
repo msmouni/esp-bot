@@ -145,6 +145,16 @@ public:
     {
         m_state = ClientState::Connected;
     }
+
+    bool isAuthenticated()
+    {
+        return m_state == ClientState::Authenticated;
+    }
+
+    bool isTakingControl()
+    {
+        return m_state == ClientState::TakingControl;
+    }
 };
 
 #endif // CLIENT_H
