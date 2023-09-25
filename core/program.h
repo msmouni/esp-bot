@@ -19,8 +19,10 @@ private:
 #endif
     static bool m_gpio_state;
     IoPinOutput m_gpio_tst = IoPinOutput(GPIO_NUM_13, false);
-    PeriodicTimer *m_timer_gpio_toggle = NULL;
-    static void gpioToggle1s(void *);
+    PeriodicTimer *m_robot_control_timer = NULL;
+    static Option<RobotControl> m_robot_control;
+    static void processRobotControl(void *);
+    // static void gpioToggle1s(void *);
 
     esp_err_t initNvs();
 

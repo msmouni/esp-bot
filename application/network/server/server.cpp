@@ -144,20 +144,27 @@ void NetServer::tryToConnetClient()
 // TODO: STORE MSGs IN BUFFER
 void NetServer::tryToRecvTcpMsg()
 {
-    // CONTROL messages ...
-    // TMP
-    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvTcpMsg();
+    Option<ServerFrame<MAX_MSG_SIZE>> opt_msg = m_clients.getRecvMsg();
 
     if (opt_msg.isSome())
     {
-        // TMP
-        // uint8_t m_recv_buffer[MAX_MSG_SIZE] = {0};
 
         ServerFrame<MAX_MSG_SIZE> msg = opt_msg.getData();
 
-        ESP_LOGI(SERVER_TAG, "Client_%d:", m_clients.getClientTakingControl().getData());
+        if (msg.getId() == ServerFrameId::Control)
+        {
+            char *msg_data = reinterpret_cast<char *>(msg.getDataPtr());
+            ControlFrameData control_data = ControlFrameData(msg_data);
 
-        msg.debug();
+            m_robot_control.set(RobotControl(control_data.m_joystick_x, control_data.m_joystick_y));
+
+            // TMP
+            // ESP_LOGI(SERVER_TAG, "(x:%f, y:%f)", control_data.m_joystick_x, control_data.m_joystick_y);
+        }
+
+        /*ESP_LOGI(SERVER_TAG, "Client_%d:", m_clients.getClientTakingControl().getData());
+
+        msg.debug();*/
 
         // msg.toBytes(m_recv_buffer);
 
@@ -179,4 +186,9 @@ bool NetServer::tryToSendUdpMsg(void *data_ptr, size_t data_size)
 {
 
     return m_clients.sendUdpMsgToAll(data_ptr, data_size).isOk();
+}
+
+Option<RobotControl> NetServer::getRobotControl()
+{
+    return m_robot_control.get();
 }

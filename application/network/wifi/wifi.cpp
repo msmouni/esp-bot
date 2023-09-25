@@ -319,6 +319,11 @@ bool Wifi::tryToSendUdpMsg(void *data_ptr, size_t data_size)
     return m_server.tryToSendUdpMsg(data_ptr, data_size);
 }
 
+Option<RobotControl> Wifi::getRobotControl()
+{
+    return m_server.getRobotControl();
+}
+
 void Wifi::log(const char *debug_msg)
 {
     ESP_LOGI(WIFI_TAG, "%s", debug_msg);

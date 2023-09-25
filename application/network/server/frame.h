@@ -19,6 +19,7 @@ enum class ServerFrameId : uint8_t
     Authentification = 0x01,
     Status = 0x02,
     CamPic = 0x03,
+    Control = 0x04,
     Debug = 0x0F,
     Unknown = UINT8_MAX,
 };
@@ -219,6 +220,38 @@ struct StatusFrameData
         *bytes = (uint8_t)m_auth_type;
 
         return 1;
+    }
+};
+
+////////////////////////////////////////////////////////////
+struct ControlFrameData
+{
+    float m_joystick_x; // -1..1
+    float m_joystick_y; // -1..1
+
+    ControlFrameData(char *bytes)
+    {
+        m_joystick_x = (((float)(*bytes)) - 127) / 127; // 0..2
+
+        bytes++;
+
+        m_joystick_y = (((float)(*bytes)) - 127) / 127; // 0..2
+    }
+
+    ControlFrameData(float joystick_x, float joystick_y)
+    {
+        m_joystick_x = joystick_x;
+        m_joystick_y = joystick_y;
+    }
+
+    uint16_t toBytes(char *bytes)
+    {
+
+        *bytes = (uint8_t)((1 + m_joystick_x) * 127); // 0..254
+        bytes++;
+        *bytes = (uint8_t)((1 + m_joystick_y) * 127); // 0..254
+
+        return 2;
     }
 };
 

@@ -1,10 +1,27 @@
 #include "program.h"
 
 bool MainProgram::m_gpio_state = false;
+Option<RobotControl> MainProgram::m_robot_control = Option<RobotControl>();
 
-void MainProgram::gpioToggle1s(void *args)
+/*void MainProgram::gpioToggle1s(void *args)
 {
     m_gpio_state = !m_gpio_state;
+    // bool state = m_gpio_tst.state();
+    // m_gpio_tst.set(!state);
+}*/
+
+void MainProgram::processRobotControl(void *args)
+{
+    if (m_robot_control.isSome())
+    {
+        RobotControl robot_control = m_robot_control.getData();
+        m_gpio_state = robot_control.getY() >= 0.5;
+    }
+    else
+    {
+        m_gpio_state = false;
+    }
+    // m_gpio_state = !m_gpio_state;
     // bool state = m_gpio_tst.state();
     // m_gpio_tst.set(!state);
 }
@@ -63,8 +80,9 @@ esp_err_t MainProgram::setup()
         status = m_gpio_tst.init();
         if (ESP_OK == status)
         {
-            m_timer_gpio_toggle = new PeriodicTimer("Camera_Take_Pic_100ms", gpioToggle1s, NULL, 1000000);
-            status = m_timer_gpio_toggle->start();
+            // m_timer_gpio_toggle = new PeriodicTimer("Toggle", gpioToggle1s, NULL, 1000000);
+            m_robot_control_timer = new PeriodicTimer("Control", processRobotControl, NULL, 100000); // 100ms
+            status = m_robot_control_timer->start();
         }
     }
 
@@ -110,6 +128,8 @@ void MainProgram::run(void)
             // Create Tasks instead of global loop
 
             update();
+
+            m_robot_control = m_wifi->getRobotControl();
 
             break;
         }

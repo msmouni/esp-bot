@@ -15,6 +15,11 @@
 #include "clients.h"
 #include "timer.h"
 #include "handler.h"
+#include "control.h"
+#include "watchdog.h"
+#include "additional.h"
+
+using namespace additional::option;
 
 class NetServer
 {
@@ -37,6 +42,8 @@ private:
     // In order to create timer after the application has started
     PeriodicTimer *m_timer_send_25ms = NULL;
 
+    WatchDog<RobotControl> m_robot_control = WatchDog<RobotControl>(250); // Timeout = 2.5 *100 ms
+
     // Try to connet clients
     void tryToConnetClient();
 
@@ -57,6 +64,8 @@ public:
     bool tryToSendUdpMsg(void *, size_t);
 
     ServerError update();
+
+    Option<RobotControl> getRobotControl();
 };
 
 #endif // SERVER_H

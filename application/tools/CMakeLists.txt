@@ -1,4 +1,4 @@
-set(SRC_DIRECTORIES buffer time additional)
+set(SRC_DIRECTORIES buffer time additional watchdog)
 
 idf_component_register(SRC_DIRS ${SRC_DIRECTORIES}
     INCLUDE_DIRS ${SRC_DIRECTORIES}

@@ -29,9 +29,9 @@ private:
 
     // Later: Mutex on a struct that holds Rx and Tx buffer, to be shared between Network_Task and other_task
     static const uint8_t RxBufferSize = 10;
-    CircularBuffer<ServerFrame<MaxFrameLen>, RxBufferSize> rx_frames_buffer; // From client taking control
+    CircularBuffer<ServerFrame<MaxFrameLen>, RxBufferSize> m_rx_frames_buffer; // From client taking control
     static const uint8_t TxBufferSize = 10;
-    CircularBuffer<ServerFrame<MaxFrameLen>, TxBufferSize> tx_frames_buffer; // To all authentified clients
+    CircularBuffer<ServerFrame<MaxFrameLen>, TxBufferSize> m_tx_frames_buffer; // To all authentified clients
     CircularBuffer<StatusFrameData, TxBufferSize> m_status_data_to_send;
     ServerFrame<MaxFrameLen> m_tmp_frame;
     Option<int> m_ap_udpfd = Option<int>();
@@ -40,6 +40,7 @@ private:
     Option<struct sockaddr_in *> getClientAddr(uint8_t);
     void deleteClient(uint8_t);
     Result<int, ClientError> sendUdpMsg(int, void *, size_t);
+    void tryRecvUdpMsg();
     bool sendStatusToClient(int, Option<StatusFrameData> &);
     bool sendTcpMsgToClient(int, Option<ServerFrame<MaxFrameLen>> &);
     bool processClientTcpMsg(int);
@@ -57,7 +58,7 @@ public:
     Option<struct sockaddr_in *> getNextClientAddr(void);
     void addClient(ConnectedClient);
     void update();
-    Option<ServerFrame<MaxFrameLen>> getRecvTcpMsg();
+    Option<ServerFrame<MaxFrameLen>> getRecvMsg();
     ClientsError sendTcpMsg(ServerFrame<MaxFrameLen>);
     ClientsError sendStatus(StatusFrameData);
     void setApUdpFd(Option<int>);
@@ -132,16 +133,16 @@ void Clients<NbAllowedClients, MaxFrameLen>::deleteClient(uint8_t client_index)
 }
 
 template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
-Option<ServerFrame<MaxFrameLen>> Clients<NbAllowedClients, MaxFrameLen>::getRecvTcpMsg()
+Option<ServerFrame<MaxFrameLen>> Clients<NbAllowedClients, MaxFrameLen>::getRecvMsg()
 {
-    return rx_frames_buffer.get();
+    return m_rx_frames_buffer.get();
 }
 
 template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 ClientsError Clients<NbAllowedClients, MaxFrameLen>::sendTcpMsg(ServerFrame<MaxFrameLen> frame)
 {
     // TODO: Broadcast or send to one client
-    if (tx_frames_buffer.push(frame))
+    if (m_tx_frames_buffer.push(frame))
     {
         return ClientsError::None;
     }
@@ -324,6 +325,48 @@ bool Clients<NbAllowedClients, MaxFrameLen>::sendStatusToClient(int client_idx, 
 }
 
 template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
+void Clients<NbAllowedClients, MaxFrameLen>::tryRecvUdpMsg()
+{
+    if (m_client_taking_control.isSome())
+    {
+        uint8_t client_taking_control_idx = m_client_taking_control.getData();
+
+        sockaddr_in *client_addr = m_clients[client_taking_control_idx].getAddrPtr();
+        WhichSocket &connected_to = m_clients[client_taking_control_idx].getSocketConnectedTo();
+
+        int r = 0;
+
+        if (m_ap_udpfd.isSome() && connected_to == WhichSocket::Ap)
+        {
+            m_tmp_frame.clear();
+
+            // The argument addrlen is a value-result argument, which the caller should initialize before the call to the size of the buffer associated with src_addr, and modified on return to indicate the actual size of the source address.
+            socklen_t socket_len = sizeof(*client_addr);
+
+            r = recvfrom(m_ap_udpfd.getData(), m_tmp_frame.getBufferRef(), MaxFrameLen, 0, (struct sockaddr *)client_addr, &socket_len);
+        }
+        else if (m_sta_udpfd.isSome() && connected_to == WhichSocket::Sta)
+        {
+            m_tmp_frame.clear();
+
+            socklen_t socket_len = sizeof(*client_addr);
+
+            r = recvfrom(m_sta_udpfd.getData(), m_tmp_frame.getBufferRef(), MaxFrameLen, 0, (struct sockaddr *)client_addr, &socket_len);
+        }
+
+        if (r <= 0)
+        {
+            m_tmp_frame.clear();
+        }
+        else
+        {
+            m_rx_frames_buffer.push(m_tmp_frame);
+            m_tmp_frame.clear();
+        }
+    }
+}
+
+template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 bool Clients<NbAllowedClients, MaxFrameLen>::processClientTcpMsg(int client_idx)
 {
     Result<Option<ServerFrame<MaxFrameLen>>, ClientError> res = m_clients[client_idx].tryToRecvTcpMsg();
@@ -434,7 +477,7 @@ bool Clients<NbAllowedClients, MaxFrameLen>::processClientTcpMsg(int client_idx)
                 else
                 {
                     // Store Messages from client taking control
-                    rx_frames_buffer.push(msg);
+                    m_rx_frames_buffer.push(msg);
                 }
                 break;
             }
@@ -470,7 +513,7 @@ template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
 void Clients<NbAllowedClients, MaxFrameLen>::update()
 {
 
-    Option<ServerFrame<MaxFrameLen>> opt_msg = tx_frames_buffer.get();
+    Option<ServerFrame<MaxFrameLen>> opt_msg = m_tx_frames_buffer.get();
     Option<StatusFrameData> opt_status_data = m_status_data_to_send.get();
 
     int client_idx = 0;
@@ -495,6 +538,9 @@ void Clients<NbAllowedClients, MaxFrameLen>::update()
 
         client_idx += 1;
     }
+
+    // Try to recv Udp Msgs from CLient taking control
+    tryRecvUdpMsg();
 }
 
 template <uint8_t NbAllowedClients, uint16_t MaxFrameLen>
