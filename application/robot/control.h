@@ -1,3 +1,6 @@
+#ifndef ROBOT_CONTROL_H
+#define ROBOT_CONTROL_H
+
 struct RobotControl
 {
     float m_x;
@@ -16,3 +19,5 @@ struct RobotControl
         return m_y;
     }
 };
+
+#endif // ROBOT_CONTROL_H

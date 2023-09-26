@@ -6,4 +6,5 @@ idf_component_register(SRCS ${SOURCES}
     esp_common
     network
     tools
-    io_pin)
+    io_pin
+    robot)

@@ -8,4 +8,4 @@ set(SRC_DIRECTORIES wifi server clients)
 
 idf_component_register(SRC_DIRS ${SRC_DIRECTORIES}
     INCLUDE_DIRS ${SRC_DIRECTORIES}
-    REQUIRES esp_wifi nvs_flash esp_event esp_netif lwip tools cam)
+    REQUIRES esp_wifi nvs_flash esp_event esp_netif lwip tools cam robot)

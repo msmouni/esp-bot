@@ -3,6 +3,7 @@
 #include "cam.h"
 #include "state.h"
 #include "io_pin.h"
+#include "robot.h"
 
 // final specifies that this class may not appear in the base-specifier-list of another class definition (in other words, cannot be derived from).
 class MainProgram final
@@ -17,12 +18,8 @@ private:
 #if ESP_CAMERA_SUPPORTED
     Camera m_camera = Camera();
 #endif
-    static bool m_gpio_state;
-    IoPinOutput m_gpio_tst = IoPinOutput(GPIO_NUM_13, false);
-    PeriodicTimer *m_robot_control_timer = NULL;
-    static Option<RobotControl> m_robot_control;
-    static void processRobotControl(void *);
-    // static void gpioToggle1s(void *);
+
+    EspBot m_robot = {};
 
     esp_err_t initNvs();
 
